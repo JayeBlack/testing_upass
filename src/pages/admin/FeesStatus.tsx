@@ -136,7 +136,8 @@ const FeesStatus = () => {
   const filtered = records.filter((f) => {
     const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.index.includes(search);
     const matchesStatus = statusFilter === "all" || (statusFilter === "cleared" ? f.cleared : !f.cleared);
-    const matchesDept = deptFilter === "all" || f.department === deptFilter;
+    const effectiveDept = isSuperAdmin ? deptFilter : (adminDepartment || "all");
+    const matchesDept = effectiveDept === "all" || f.department === effectiveDept;
     const matchesProg = progFilter === "all" || f.program === progFilter;
     return matchesSearch && matchesStatus && matchesDept && matchesProg;
   });
