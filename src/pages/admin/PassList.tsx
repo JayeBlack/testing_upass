@@ -34,6 +34,7 @@ const PassList = () => {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
+  const { isSuperAdmin, adminDepartment } = useAdminDepartment();
 
   const filtered = graduands.filter((g) => {
     const matchesDept = deptFilter === "all" || g.department === deptFilter;
