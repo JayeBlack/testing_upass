@@ -105,8 +105,10 @@ const ManageStudents = () => {
     <DashboardLayout>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold font-display text-foreground">Manage Students</h1>
-          <p className="text-muted-foreground mt-1">{students.length} registered postgraduate students</p>
+         <h1 className="text-3xl font-bold font-display text-foreground">Manage Students</h1>
+          <p className="text-muted-foreground mt-1">
+            {isSuperAdmin ? `${students.length} registered postgraduate students` : `${adminDepartment} — ${filtered.length} students`}
+          </p>
         </div>
         <div className="flex gap-3">
           <button onClick={() => setShowBulkUpload(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
