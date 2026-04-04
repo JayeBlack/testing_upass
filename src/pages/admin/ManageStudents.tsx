@@ -63,32 +63,82 @@ const ManageStudents = () => {
     toast({ title: "Student enrolled", description: `${form.name} has been added to the system` });
   };
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQuotes = !inQuotes; }
+      else if (ch === ',' && !inQuotes) { result.push(current.trim()); current = ""; }
+      else { current += ch; }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
   const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const lines = text.split("\n").filter((l) => l.trim());
-      const newStudents: Student[] = lines.slice(1).map((line, i) => {
-        const cols = line.split(",").map((s) => s.trim());
-        return {
-          id: `bulk${i}${Date.now()}`,
-          name: cols[0] || "",
-          index: cols[1] || "",
-          email: cols[2] || "",
-          program: cols[3] || "",
-          department: cols[4] || "",
-          status: "Active" as const,
-        };
-      }).filter((s) => s.name && s.index);
+      try {
+        const text = ev.target?.result as string;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) {
+          toast({ title: "Empty file", description: "The CSV file has no data rows", variant: "destructive" });
+          return;
+        }
 
-      setStudents((prev) => [...newStudents, ...prev]);
-      setShowBulkUpload(false);
-      toast({
-        title: `${newStudents.length} students enrolled`,
-        description: "Students from the uploaded file have been added to the system",
-      });
+        // Parse header to detect column positions
+        const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z]/g, ""));
+        const colMap: Record<string, number> = {};
+        const knownCols: Record<string, string[]> = {
+          name: ["name", "fullname", "studentname", "student"],
+          index: ["index", "indexnumber", "indexno", "studentid", "id", "regno", "regnumber"],
+          email: ["email", "emailaddress", "mail"],
+          program: ["program", "programme", "course", "programname", "programmename"],
+          department: ["department", "dept", "departmentname"],
+        };
+
+        for (const [field, aliases] of Object.entries(knownCols)) {
+          const idx = headers.findIndex((h) => aliases.includes(h));
+          if (idx !== -1) colMap[field] = idx;
+        }
+
+        // Fallback: assume positional if no headers matched
+        const usePositional = Object.keys(colMap).length < 2;
+        if (usePositional) {
+          colMap.name = 0; colMap.index = 1; colMap.email = 2; colMap.program = 3; colMap.department = 4;
+        }
+
+        const newStudents: Student[] = lines.slice(1).map((line, i) => {
+          const cols = parseCSVLine(line);
+          return {
+            id: `bulk${i}${Date.now()}`,
+            name: cols[colMap.name ?? 0] || "",
+            index: cols[colMap.index ?? 1] || "",
+            email: cols[colMap.email ?? 2] || "",
+            program: cols[colMap.program ?? 3] || "",
+            department: cols[colMap.department ?? 4] || (adminDepartment || ""),
+            status: "Active" as const,
+          };
+        }).filter((s) => s.name && s.index);
+
+        if (newStudents.length === 0) {
+          toast({ title: "No valid students found", description: "Please ensure your CSV has columns: Name, Index Number, Email, Programme, Department", variant: "destructive" });
+          return;
+        }
+
+        setStudents((prev) => [...newStudents, ...prev]);
+        setShowBulkUpload(false);
+        toast({
+          title: `${newStudents.length} students enrolled`,
+          description: "Students from the uploaded file have been added to the system",
+        });
+      } catch (err) {
+        toast({ title: "File read error", description: "Could not parse the uploaded file. Please check the format.", variant: "destructive" });
+      }
     };
     reader.readAsText(file);
     e.target.value = "";
