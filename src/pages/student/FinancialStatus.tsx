@@ -25,59 +25,138 @@ const FinancialStatus = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const sanitizeAmount = (val: string) => val.replace(/GH₵/g, "GHS");
+
   const handleDownloadReceipt = async (fee: typeof fees[0]) => {
     try {
       const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF();
+      const pageW = doc.internal.pageSize.getWidth();
 
+      // --- Border ---
+      doc.setDrawColor(34, 87, 50);
+      doc.setLineWidth(0.7);
+      doc.rect(12, 10, pageW - 24, 272);
+
+      // --- Logo ---
       try {
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = umatLogo;
         await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
-        doc.addImage(img, "PNG", 85, 8, 20, 20);
-      } catch { /* continue */ }
+        doc.addImage(img, "PNG", pageW / 2 - 12, 14, 24, 24);
+      } catch { /* continue without logo */ }
 
-      doc.setFontSize(14);
+      // --- Header ---
+      doc.setFontSize(15);
       doc.setFont("helvetica", "bold");
-      doc.text("University of Mines and Technology", 105, 35, { align: "center" });
+      doc.text("UNIVERSITY OF MINES AND TECHNOLOGY", pageW / 2, 44, { align: "center" });
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text("School of Postgraduate Studies", 105, 42, { align: "center" });
+      doc.text("Tarkwa, Ghana", pageW / 2, 50, { align: "center" });
+      doc.setFontSize(9);
+      doc.text("School of Postgraduate Studies", pageW / 2, 56, { align: "center" });
+
+      // --- Title banner ---
+      doc.setFillColor(34, 87, 50);
+      doc.rect(20, 62, pageW - 40, 10, "F");
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text("FEE PAYMENT RECEIPT", 105, 52, { align: "center" });
+      doc.setTextColor(255, 255, 255);
+      doc.text("FEE PAYMENT RECEIPT", pageW / 2, 69, { align: "center" });
+      doc.setTextColor(0, 0, 0);
 
-      doc.setDrawColor(34, 87, 50);
-      doc.line(20, 57, 190, 57);
-
-      doc.setFontSize(10);
+      // --- Receipt No & Date ---
+      const receiptNo = `RCP-${Date.now().toString(36).toUpperCase()}`;
+      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      const startY = 65;
-      const lines = [
-        ["Student Name:", user?.name || "N/A"],
-        ["Index Number:", user?.indexNumber || "N/A"],
-        ["Programme:", user?.program || "N/A"],
-        ["Department:", user?.department || "N/A"],
-        ["Semester:", fee.semester],
-        ["Total Fee:", fee.amount],
-        ["Amount Paid:", fee.paid],
-        ["Balance:", fee.balance],
-        ["Status:", fee.status],
-        ["Date:", new Date().toLocaleDateString("en-GB")],
+      doc.text(`Receipt No: ${receiptNo}`, 25, 82);
+      doc.text(`Date: ${new Date().toLocaleDateString("en-GB")}`, pageW - 25, 82, { align: "right" });
+
+      // --- Divider ---
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(20, 86, pageW - 20, 86);
+
+      // --- Student Info Section ---
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("STUDENT INFORMATION", 25, 94);
+
+      const studentFields = [
+        ["Name", user?.name || "N/A"],
+        ["Index Number", user?.indexNumber || "N/A"],
+        ["Programme", user?.program || "N/A"],
+        ["Department", user?.department || "N/A"],
       ];
 
-      lines.forEach(([label, value], i) => {
+      let y = 102;
+      studentFields.forEach(([label, value]) => {
         doc.setFont("helvetica", "bold");
-        doc.text(label, 25, startY + i * 8);
+        doc.setFontSize(9);
+        doc.text(`${label}:`, 25, y);
         doc.setFont("helvetica", "normal");
-        doc.text(value, 80, startY + i * 8);
+        doc.text(value, 75, y);
+        y += 7;
       });
+
+      // --- Divider ---
+      doc.line(20, y + 2, pageW - 20, y + 2);
+      y += 10;
+
+      // --- Payment Details Section ---
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("PAYMENT DETAILS", 25, y);
+      y += 10;
+
+      // Table header
+      doc.setFillColor(240, 240, 240);
+      doc.rect(25, y - 5, pageW - 50, 8, "F");
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("Description", 28, y);
+      doc.text("Amount", pageW - 28, y, { align: "right" });
+      y += 10;
+
+      // Table rows
+      const paymentRows = [
+        ["Semester", fee.semester],
+        ["Total Fee", sanitizeAmount(fee.amount)],
+        ["Amount Paid", sanitizeAmount(fee.paid)],
+        ["Outstanding Balance", sanitizeAmount(fee.balance)],
+      ];
+
+      doc.setFont("helvetica", "normal");
+      paymentRows.forEach(([label, value]) => {
+        doc.text(label, 28, y);
+        doc.text(value, pageW - 28, y, { align: "right" });
+        doc.setDrawColor(230, 230, 230);
+        doc.line(25, y + 3, pageW - 25, y + 3);
+        y += 9;
+      });
+
+      // Status row highlighted
+      y += 2;
+      const statusColor = fee.status === "Paid" ? [34, 139, 34] : fee.status === "Partial" ? [200, 150, 0] : [200, 50, 50];
+      doc.setFont("helvetica", "bold");
+      doc.text("Payment Status:", 28, y);
+      doc.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      doc.text(fee.status.toUpperCase(), pageW - 28, y, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+
+      // --- Footer ---
+      doc.setDrawColor(34, 87, 50);
+      doc.setLineWidth(0.5);
+      doc.line(20, 255, pageW - 20, 255);
 
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");
-      doc.text("This is a computer-generated receipt.", 105, 280, { align: "center" });
-      doc.text(`Generated on ${new Date().toLocaleDateString("en-GB")}`, 105, 285, { align: "center" });
+      doc.setTextColor(100, 100, 100);
+      doc.text("This is a computer-generated receipt and does not require a signature.", pageW / 2, 262, { align: "center" });
+      doc.text("For enquiries, contact the Finance Office - School of Postgraduate Studies, UMaT", pageW / 2, 268, { align: "center" });
+      doc.text(`Generated on ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB")}`, pageW / 2, 274, { align: "center" });
+      doc.setTextColor(0, 0, 0);
 
       doc.save(`UMaT_Fee_Receipt_${fee.semester.replace(/[\s,\/]/g, "_")}.pdf`);
       toast({ title: "Receipt downloaded", description: `Payment receipt for ${fee.semester}` });
