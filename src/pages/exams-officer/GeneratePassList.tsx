@@ -2,7 +2,6 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Download } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import umatLogo from "@/assets/umat-logo.png";
 
 interface Graduand {
   name: string;
@@ -40,56 +39,20 @@ const GeneratePassList = () => {
       (yearFilter === "all" || g.year === yearFilter);
   });
 
-  const handleExportPDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
-    const doc = new jsPDF();
+  const handleExportCSV = () => {
+    const csvContent = [
+      "Name,Index Number,Programme,Department,CWA,Status",
+      ...filtered.map((g) => `${g.name},${g.index},${g.program},${g.department},${g.cwa.toFixed(1)},${g.status}`),
+    ].join("\n");
 
-    try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = umatLogo;
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
-      doc.addImage(img, "PNG", 80, 8, 25, 25);
-    } catch { /* continue */ }
-
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("University of Mines and Technology", 105, 40, { align: "center" });
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("School of Postgraduate Studies — Examinations Office", 105, 47, { align: "center" });
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("Pass List", 105, 56, { align: "center" });
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    const filterParts = [
-      yearFilter !== "all" ? `Year: ${yearFilter}` : "All Years",
-      deptFilter !== "all" ? `Dept: ${deptFilter}` : "All Depts",
-      progFilter !== "all" ? `Programme: ${progFilter}` : "All Programmes",
-    ];
-    doc.text(filterParts.join(" | "), 105, 63, { align: "center" });
-
-    autoTable(doc, {
-      startY: 70,
-      head: [["#", "Name", "Index Number", "Programme", "Department", "CWA", "Status"]],
-      body: filtered.map((g, i) => [i + 1, g.name, g.index, g.program, g.department, g.cwa.toFixed(1), g.status]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [34, 87, 50], textColor: 255 },
-    });
-
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(`Generated on ${new Date().toLocaleDateString("en-GB")} | Page ${i} of ${pageCount}`, 105, 290, { align: "center" });
-    }
-
-    doc.save(`UMaT_Pass_List_ExamsOffice.pdf`);
-    toast({ title: "PDF exported", description: "Pass list downloaded" });
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `UMaT_Pass_List_ExamsOffice.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV exported", description: "Pass list downloaded" });
   };
 
   return (
@@ -97,10 +60,10 @@ const GeneratePassList = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">Generate Pass List</h1>
-          <p className="text-muted-foreground mt-1">Filter by department, programme, and academic year</p>
+          <p className="text-muted-foreground mt-1">Filter by programme, department, and academic year</p>
         </div>
-        <button onClick={handleExportPDF} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
-          <Download size={14} /> Export PDF
+        <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
+          <Download size={14} /> Export CSV
         </button>
       </div>
 
@@ -109,13 +72,13 @@ const GeneratePassList = () => {
           <option value="all">All Years</option>
           {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-          <option value="all">All Departments</option>
-          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-        </select>
         <select value={progFilter} onChange={(e) => setProgFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Programmes</option>
           {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">All Departments</option>
+          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
       </div>
 
@@ -143,9 +106,7 @@ const GeneratePassList = () => {
                   <td className="px-6 py-4 text-sm text-muted-foreground">{g.department}</td>
                   <td className="px-6 py-4 text-sm text-center font-semibold text-foreground">{g.cwa.toFixed(1)}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${g.status === "Pass" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                      {g.status}
-                    </span>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${g.status === "Pass" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{g.status}</span>
                   </td>
                 </tr>
               ))}

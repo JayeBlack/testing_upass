@@ -2,7 +2,6 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { Download } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import umatLogo from "@/assets/umat-logo.png";
 
 interface Graduand {
   name: string;
@@ -25,89 +24,38 @@ const graduands: Graduand[] = [
 ];
 
 const departments = [...new Set(graduands.map((g) => g.department))];
+const programs = [...new Set(graduands.map((g) => g.program))];
 const years = [...new Set(graduands.map((g) => g.year))].sort().reverse();
 
 const PassList = () => {
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [progFilter, setProgFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const filtered = graduands.filter((g) => {
     const matchesDept = deptFilter === "all" || g.department === deptFilter;
+    const matchesProg = progFilter === "all" || g.program === progFilter;
     const matchesYear = yearFilter === "all" || g.year === yearFilter;
     const matchesStatus = statusFilter === "all" || g.status === statusFilter;
-    return matchesDept && matchesYear && matchesStatus;
+    return matchesDept && matchesProg && matchesYear && matchesStatus;
   });
 
-  const handleExportPDF = async () => {
-    const { default: jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
+  const handleExportCSV = () => {
+    const csvContent = [
+      "Name,Index Number,Programme,Department,CWA,Eligibility",
+      ...filtered.map((g) => `${g.name},${g.index},${g.program},${g.department},${g.cwa.toFixed(1)},${g.status}`),
+    ].join("\n");
 
-    const doc = new jsPDF();
-
-    // Add UMaT logo
-    try {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = umatLogo;
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-      });
-      doc.addImage(img, "PNG", 80, 8, 25, 25);
-    } catch {
-      // Logo failed to load, continue without it
-    }
-
-    // Header text
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("University of Mines and Technology", 105, 40, { align: "center" });
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("School of Postgraduate Studies", 105, 47, { align: "center" });
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text("General Pass List", 105, 56, { align: "center" });
-
-    // Filter info
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    const filterText = [
-      yearFilter !== "all" ? `Year: ${yearFilter}` : "All Years",
-      deptFilter !== "all" ? `Department: ${deptFilter}` : "All Departments",
-    ].join(" | ");
-    doc.text(filterText, 105, 63, { align: "center" });
-
-    // Table
-    autoTable(doc, {
-      startY: 70,
-      head: [["#", "Name", "Index Number", "Program", "Department", "CWA", "Status"]],
-      body: filtered.map((g, i) => [
-        i + 1,
-        g.name,
-        g.index,
-        g.program,
-        g.department,
-        g.cwa.toFixed(1),
-        g.status,
-      ]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [34, 87, 50], textColor: 255 },
-    });
-
-    // Footer
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(`Generated on ${new Date().toLocaleDateString("en-GB")} | Page ${i} of ${pageCount}`, 105, 290, { align: "center" });
-    }
-
-    doc.save(`UMaT_Pass_List${yearFilter !== "all" ? `_${yearFilter}` : ""}${deptFilter !== "all" ? `_${deptFilter.replace(/\s+/g, "_")}` : ""}.pdf`);
-    toast({ title: "PDF exported", description: "Pass list has been downloaded" });
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `UMaT_Pass_List${yearFilter !== "all" ? `_${yearFilter}` : ""}${deptFilter !== "all" ? `_${deptFilter.replace(/\s+/g, "_")}` : ""}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "CSV exported", description: "Pass list has been downloaded" });
   };
 
   return (
@@ -117,42 +65,25 @@ const PassList = () => {
           <h1 className="text-3xl font-bold font-display text-foreground">Pass List</h1>
           <p className="text-muted-foreground mt-1">Graduands eligible for convocation</p>
         </div>
-        <button
-          onClick={handleExportPDF}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
-        >
-          <Download size={14} />
-          Export PDF
+        <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
+          <Download size={14} /> Export CSV
         </button>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <select
-          value={yearFilter}
-          onChange={(e) => setYearFilter(e.target.value)}
-          className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
+        <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Years</option>
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-        <select
-          value={deptFilter}
-          onChange={(e) => setDeptFilter(e.target.value)}
-          className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
+        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Departments</option>
-          {departments.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
+          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        >
+        <select value={progFilter} onChange={(e) => setProgFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">All Programmes</option>
+          {programs.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Status</option>
           <option value="Eligible">Eligible</option>
           <option value="Ineligible">Ineligible</option>
@@ -168,7 +99,7 @@ const PassList = () => {
               <tr className="border-b border-border">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Index</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Program</th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Programme</th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Department</th>
                 <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">CWA</th>
                 <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Eligibility</th>
@@ -183,18 +114,12 @@ const PassList = () => {
                   <td className="px-6 py-4 text-sm text-muted-foreground">{g.department}</td>
                   <td className="px-6 py-4 text-sm text-center font-semibold text-foreground">{g.cwa.toFixed(1)}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                      g.status === "Eligible" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                    }`}>
-                      {g.status}
-                    </span>
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${g.status === "Eligible" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{g.status}</span>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No graduands match the selected filters</td>
-                </tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No graduands match the selected filters</td></tr>
               )}
             </tbody>
           </table>
