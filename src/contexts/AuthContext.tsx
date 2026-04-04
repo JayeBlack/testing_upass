@@ -46,6 +46,7 @@ const mockUsers: Record<UserRole, User> = {
     email: "admin@umat.edu.gh",
     name: "Prof. Kofi Asante",
     role: "Admin",
+    department: "Computer Science",
     avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
   },
   Dean: {
