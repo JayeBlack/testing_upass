@@ -66,7 +66,9 @@ const PassList = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">Pass List</h1>
-          <p className="text-muted-foreground mt-1">Graduands eligible for convocation</p>
+          <p className="text-muted-foreground mt-1">
+            {isSuperAdmin ? "Graduands eligible for convocation" : `${adminDepartment} — Graduands eligible for convocation`}
+          </p>
         </div>
         <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
           <Download size={14} /> Export CSV
