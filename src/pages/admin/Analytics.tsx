@@ -4,9 +4,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
 } from "recharts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
+import { useDataStore } from "@/contexts/DataStoreContext";
 
 // --- Academic year data sets ---
 interface YearData {
