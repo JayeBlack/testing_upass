@@ -45,7 +45,9 @@ const ManageStudents = () => {
 
   const filtered = students.filter((s) => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.index.includes(search);
-    const matchesDept = deptFilter === "all" || s.department === deptFilter;
+    // Departmental admin: always filter by their department
+    const effectiveDept = isSuperAdmin ? deptFilter : (adminDepartment || "all");
+    const matchesDept = effectiveDept === "all" || s.department === effectiveDept;
     return matchesSearch && matchesDept;
   });
 
