@@ -25,7 +25,13 @@ const FinancialStatus = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const sanitizeAmount = (val: string) => val.replace(/GH₵/g, "GHS");
+  const sanitizeAmount = (val: string) => {
+    // Remove all non-ASCII characters and replace GH₵ with GHS
+    return val
+      .replace(/GH\u20B5/g, "GHS")  // ₵ unicode
+      .replace(/GH₵/g, "GHS")
+      .replace(/[^\x00-\x7F]/g, ""); // strip any remaining non-ASCII
+  };
 
   const handleDownloadReceipt = async (fee: typeof fees[0]) => {
     try {
