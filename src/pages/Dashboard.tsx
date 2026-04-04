@@ -102,14 +102,14 @@ const Dashboard = () => {
   const accountantStats = [
     { icon: <Banknote size={18} className="text-secondary-foreground" />, label: "Total Fees Collected", value: "GH₵ 1.2M", accent: true, trend: "up" as const, sub: "+18%", onClick: () => navigate("/accountant/analytics") },
     { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: "82%", trend: "up" as const, sub: "+5%" },
-    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: "44", trend: "down" as const, sub: "-8", onClick: () => navigate("/admin/fees") },
+    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: String(totalStudents - activeStudents), trend: "down" as const, sub: "-8", onClick: () => navigate("/admin/fees") },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Receipts", value: "8" },
   ];
 
   const examsOfficerStats = [
     { icon: <BarChart3 size={18} className="text-secondary-foreground" />, label: "Results Published", value: "3", accent: true },
     { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Batches", value: "5", trend: "down" as const, sub: "-2" },
-    { icon: <Users size={18} className="text-muted-foreground" />, label: "Total Students", value: "247" },
+    { icon: <Users size={18} className="text-muted-foreground" />, label: "Total Students", value: String(totalStudents) },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "86%", trend: "up" as const, sub: "+3%" },
   ];
 
