@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { CheckCircle, XCircle, Search, Filter } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle, XCircle, Search, Filter, Upload } from "lucide-react";
+import { useState, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 
 interface FeeRecord {
@@ -37,6 +37,9 @@ const FeesStatus = () => {
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [progFilter, setProgFilter] = useState<string>("all");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [importPreview, setImportPreview] = useState<FeeRecord[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleToggleClearance = (index: string) => {
     setRecords((prev) =>
@@ -52,6 +55,79 @@ const FeesStatus = () => {
     );
   };
 
+  const parsePaymentCSV = (text: string): FeeRecord[] => {
+    const lines = text.trim().split("\n");
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
+    const nameIdx = headers.findIndex((h) => h.includes("name") || h.includes("student"));
+    const indexIdx = headers.findIndex((h) => h.includes("index") || h.includes("id") || h.includes("number"));
+    const deptIdx = headers.findIndex((h) => h.includes("department") || h.includes("dept"));
+    const progIdx = headers.findIndex((h) => h.includes("programme") || h.includes("program"));
+    const totalIdx = headers.findIndex((h) => h.includes("total") || h.includes("fee"));
+    const paidIdx = headers.findIndex((h) => h.includes("paid") || h.includes("amount"));
+
+    return lines.slice(1).filter((l) => l.trim()).map((line) => {
+      const cols = line.split(",").map((c) => c.trim().replace(/"/g, ""));
+      const totalFees = parseFloat(cols[totalIdx >= 0 ? totalIdx : 4] || "0") || 0;
+      const amountPaid = parseFloat(cols[paidIdx >= 0 ? paidIdx : 5] || "0") || 0;
+      return {
+        name: cols[nameIdx >= 0 ? nameIdx : 0] || "",
+        index: cols[indexIdx >= 0 ? indexIdx : 1] || "",
+        department: cols[deptIdx >= 0 ? deptIdx : 2] || "",
+        program: cols[progIdx >= 0 ? progIdx : 3] || "",
+        totalFees,
+        amountPaid,
+        outstanding: Math.max(0, totalFees - amountPaid),
+        cleared: amountPaid >= totalFees,
+      };
+    }).filter((r) => r.name && r.index);
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith(".csv")) {
+      toast({ title: "Invalid format", description: "Please upload a CSV file", variant: "destructive" });
+      e.target.value = "";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const parsed = parsePaymentCSV(text);
+      if (parsed.length === 0) {
+        toast({ title: "Import failed", description: "Could not parse records. Ensure columns include Name, Index Number, Department, Programme, Total Fees, Amount Paid.", variant: "destructive" });
+        return;
+      }
+      setImportPreview(parsed);
+      setShowImport(false);
+      toast({ title: "File parsed", description: `${parsed.length} payment records ready to import` });
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const confirmImport = () => {
+    setRecords((prev) => {
+      const existingIndexes = new Set(prev.map((r) => r.index));
+      const newRecords = importPreview.filter((r) => !existingIndexes.has(r.index));
+      const updatedRecords = prev.map((existing) => {
+        const update = importPreview.find((r) => r.index === existing.index);
+        if (!update) return existing;
+        const newPaid = existing.amountPaid + update.amountPaid;
+        return {
+          ...existing,
+          amountPaid: newPaid,
+          outstanding: Math.max(0, existing.totalFees - newPaid),
+          cleared: newPaid >= existing.totalFees,
+        };
+      });
+      return [...updatedRecords, ...newRecords];
+    });
+    toast({ title: "Payments imported", description: `${importPreview.length} records processed and added to the system` });
+    setImportPreview([]);
+  };
+
   const filtered = records.filter((f) => {
     const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.index.includes(search);
     const matchesStatus = statusFilter === "all" || (statusFilter === "cleared" ? f.cleared : !f.cleared);
@@ -60,16 +136,84 @@ const FeesStatus = () => {
     return matchesSearch && matchesStatus && matchesDept && matchesProg;
   });
 
+  const allDepts = [...new Set(records.map((f) => f.department))];
+  const allProgs = [...new Set(records.map((f) => f.program))];
   const totalCleared = records.filter((f) => f.cleared).length;
   const totalOwing = records.filter((f) => !f.cleared).length;
   const totalOutstanding = records.reduce((s, f) => s + f.outstanding, 0);
 
   return (
     <DashboardLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold font-display text-foreground">Fees Status</h1>
-        <p className="text-muted-foreground mt-1">Financial clearance for postgraduate students</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl font-bold font-display text-foreground">Students Fees</h1>
+          <p className="text-muted-foreground mt-1">Financial clearance for postgraduate students</p>
+        </div>
+        <button
+          onClick={() => setShowImport(true)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
+        >
+          <Upload size={14} /> Import Manual Payments (.csv)
+        </button>
       </div>
+
+      {/* Import Modal */}
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setShowImport(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-lg font-bold text-foreground mb-2">Import Manual Payments</h3>
+            <p className="text-sm text-muted-foreground mb-4">Upload a CSV file containing the list of students who made payments manually at their respective departments. The system will read the file and add payments to the history by department.</p>
+            <p className="text-xs text-muted-foreground mb-3">Expected columns: Student Name, Index Number, Department, Programme, Total Fees, Amount Paid</p>
+            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary/50 transition-colors"
+            >
+              <Upload size={28} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-foreground font-medium">Click to upload CSV file</p>
+              <p className="text-xs text-muted-foreground mt-1">Only .csv format accepted</p>
+            </div>
+            <button onClick={() => setShowImport(false)} className="w-full mt-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Import Preview */}
+      {importPreview.length > 0 && (
+        <div className="bg-card rounded-xl border border-border p-5 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display text-sm font-bold text-foreground">Payment Import Preview ({importPreview.length} records)</h3>
+            <div className="flex gap-2">
+              <button onClick={() => setImportPreview([])} className="px-3 py-1.5 text-xs border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">Discard</button>
+              <button onClick={confirmImport} className="px-4 py-1.5 text-xs rounded-lg gradient-gold text-secondary-foreground font-medium hover:opacity-90 transition-opacity">Confirm Import</button>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-60 overflow-y-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-card">
+                <tr className="border-b border-border">
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Name</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Index</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Department</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Programme</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Paid (GHS)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importPreview.map((r, i) => (
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="px-3 py-2 text-foreground">{r.name}</td>
+                    <td className="px-3 py-2 font-mono text-muted-foreground">{r.index}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.department}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.program}</td>
+                    <td className="px-3 py-2 text-right text-foreground">{r.amountPaid.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
         <div className="bg-card rounded-xl border border-border px-5 py-4 flex items-center gap-3">
@@ -89,7 +233,7 @@ const FeesStatus = () => {
         <div className="bg-card rounded-xl border border-border px-5 py-4 flex items-center gap-3">
           <Filter size={20} className="text-warning" />
           <div>
-            <p className="text-xl font-bold font-display text-foreground">GH₵ {totalOutstanding.toLocaleString()}</p>
+            <p className="text-xl font-bold font-display text-foreground">GHS {totalOutstanding.toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Total Owed</p>
           </div>
         </div>
@@ -121,7 +265,7 @@ const FeesStatus = () => {
                   <input type="checkbox" checked={deptFilter === "all"} onChange={() => setDeptFilter("all")} className="rounded border-input" />
                   All Departments
                 </label>
-                {departments.map((d) => (
+                {allDepts.map((d) => (
                   <label key={d} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                     <input type="checkbox" checked={deptFilter === d} onChange={() => setDeptFilter(deptFilter === d ? "all" : d)} className="rounded border-input" />
                     {d}
@@ -136,7 +280,7 @@ const FeesStatus = () => {
                   <input type="checkbox" checked={progFilter === "all"} onChange={() => setProgFilter("all")} className="rounded border-input" />
                   All Programmes
                 </label>
-                {programs.map((p) => (
+                {allProgs.map((p) => (
                   <label key={p} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                     <input type="checkbox" checked={progFilter === p} onChange={() => setProgFilter(progFilter === p ? "all" : p)} className="rounded border-input" />
                     {p}
@@ -173,13 +317,13 @@ const FeesStatus = () => {
                   <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{f.index}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{f.program}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{f.department}</td>
-                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GH₵ {f.totalFees.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GH₵ {f.amountPaid.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.totalFees.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.amountPaid.toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-foreground">
                     {f.outstanding > 0 ? (
-                      <span className="text-destructive">GH₵ {f.outstanding.toLocaleString()}</span>
+                      <span className="text-destructive">GHS {f.outstanding.toLocaleString()}</span>
                     ) : (
-                      <span className="text-success">GH₵ 0</span>
+                      <span className="text-success">GHS 0</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">

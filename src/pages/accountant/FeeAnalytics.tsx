@@ -1,64 +1,92 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { useState } from "react";
-import { Filter, GraduationCap } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Filter } from "lucide-react";
 
-const monthlyRevenue = [
-  { month: "Sep", collected: 320000, target: 400000, department: "Computer Science", year: "2023" },
-  { month: "Oct", collected: 180000, target: 400000, department: "Mining Engineering", year: "2023" },
-  { month: "Nov", collected: 95000, target: 400000, department: "Environmental Science", year: "2023" },
-  { month: "Dec", collected: 60000, target: 400000, department: "Geological Engineering", year: "2023" },
-  { month: "Jan", collected: 240000, target: 400000, department: "Computer Science", year: "2024" },
-  { month: "Feb", collected: 150000, target: 400000, department: "Mining Engineering", year: "2024" },
-  { month: "Sep", collected: 280000, target: 400000, department: "Computer Science", year: "2024" },
-  { month: "Oct", collected: 210000, target: 400000, department: "Environmental Science", year: "2024" },
-  { month: "Nov", collected: 175000, target: 400000, department: "Electrical Engineering", year: "2024" },
-  { month: "Dec", collected: 130000, target: 400000, department: "Mechanical Engineering", year: "2024" },
-  { month: "Jan", collected: 195000, target: 400000, department: "Mathematical Sciences", year: "2024" },
-  { month: "Feb", collected: 220000, target: 400000, department: "Petroleum Engineering", year: "2024" },
+// Shared payment store that both online & manual imports feed into
+interface PaymentRecord {
+  studentName: string;
+  index: string;
+  department: string;
+  program: string;
+  totalFees: number;
+  amountPaid: number;
+  paidMonth: string;
+  paidYear: string;
+}
+
+const basePayments: PaymentRecord[] = [
+  { studentName: "Kwame Mensah", index: "UMaT/PG/0234/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Ama Serwaa", index: "UMaT/PG/0198/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Yaw Boateng", index: "UMaT/PG/0312/22", department: "Computer Science", program: "MPhil CS", totalFees: 5200, amountPaid: 3400, paidMonth: "Oct", paidYear: "2024" },
+  { studentName: "Efua Dankwah", index: "UMaT/PG/0287/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, paidMonth: "Oct", paidYear: "2024" },
+  { studentName: "Kofi Adjei", index: "UMaT/PG/0345/22", department: "Computer Science", program: "MPhil CS", totalFees: 5200, amountPaid: 2600, paidMonth: "Nov", paidYear: "2024" },
+  { studentName: "Abena Owusu", index: "UMaT/PG/0401/23", department: "Mining Engineering", program: "MSc. Mining Eng", totalFees: 6000, amountPaid: 6000, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Yaw Frimpong", index: "UMaT/PG/0178/21", department: "Mining Engineering", program: "MSc. Mining Eng", totalFees: 6000, amountPaid: 4500, paidMonth: "Nov", paidYear: "2024" },
+  { studentName: "Esi Appiah", index: "UMaT/PG/0145/21", department: "Electrical Engineering", program: "MSc. Electrical Eng", totalFees: 5500, amountPaid: 5500, paidMonth: "Oct", paidYear: "2024" },
+  { studentName: "Akua Mensah", index: "UMaT/PG/0112/21", department: "Electrical Engineering", program: "MSc. Electrical Eng", totalFees: 5500, amountPaid: 3000, paidMonth: "Dec", paidYear: "2024" },
+  { studentName: "Nana Agyei", index: "UMaT/PG/0420/23", department: "Mechanical Engineering", program: "MSc. Mechanical Eng", totalFees: 5800, amountPaid: 5800, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Kwesi Boadu", index: "UMaT/PG/0455/23", department: "Environmental Science", program: "MSc. Env. Sci", totalFees: 5000, amountPaid: 5000, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Adjoa Poku", index: "UMaT/PG/0460/23", department: "Geological Engineering", program: "MSc. Geo. Eng", totalFees: 5500, amountPaid: 4000, paidMonth: "Oct", paidYear: "2024" },
+  { studentName: "Yaw Asare", index: "UMaT/PG/0470/23", department: "Mathematical Sciences", program: "MSc. Math Sci", totalFees: 4800, amountPaid: 4800, paidMonth: "Nov", paidYear: "2024" },
+  { studentName: "Akosua Darko", index: "UMaT/PG/0480/23", department: "Petroleum Engineering", program: "MSc. Petro. Eng", totalFees: 6200, amountPaid: 6200, paidMonth: "Sep", paidYear: "2024" },
+  { studentName: "Kofi Badu", index: "UMaT/PG/0490/23", department: "Petroleum Engineering", program: "MSc. Petro. Eng", totalFees: 6200, amountPaid: 3100, paidMonth: "Dec", paidYear: "2024" },
+  { studentName: "Ama Tetteh", index: "UMaT/PG/0501/23", department: "Environmental Science", program: "MSc. Env. Sci", totalFees: 5000, amountPaid: 2500, paidMonth: "Jan", paidYear: "2024" },
+  { studentName: "Kweku Ofori", index: "UMaT/PG/0510/23", department: "Geological Engineering", program: "MSc. Geo. Eng", totalFees: 5500, amountPaid: 5500, paidMonth: "Feb", paidYear: "2024" },
 ];
-
-const complianceByProgram = [
-  { program: "MSc. IT", rate: 88, department: "Computer Science", year: "2024" },
-  { program: "MSc. Mining", rate: 76, department: "Mining Engineering", year: "2024" },
-  { program: "MSc. Env. Sci", rate: 82, department: "Environmental Science", year: "2024" },
-  { program: "MSc. Geo. Eng", rate: 79, department: "Geological Engineering", year: "2023" },
-  { program: "MSc. CS", rate: 91, department: "Computer Science", year: "2023" },
-  { program: "MSc. Elec. Eng", rate: 84, department: "Electrical Engineering", year: "2024" },
-  { program: "MSc. Mech. Eng", rate: 80, department: "Mechanical Engineering", year: "2024" },
-  { program: "MSc. Math Sci", rate: 77, department: "Mathematical Sciences", year: "2024" },
-  { program: "MSc. Petro. Eng", rate: 85, department: "Petroleum Engineering", year: "2024" },
-];
-
-const departments = [...new Set([...monthlyRevenue.map((r) => r.department), ...complianceByProgram.map((c) => c.department)])].sort();
-const years = [...new Set([...monthlyRevenue.map((r) => r.year), ...complianceByProgram.map((c) => c.year)])].sort();
 
 const FeeAnalytics = () => {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
 
-  const filteredRevenue = monthlyRevenue.filter((r) => {
-    const matchYear = yearFilter === "all" || r.year === yearFilter;
-    const matchDept = deptFilter === "all" || r.department === deptFilter;
-    return matchYear && matchDept;
-  });
+  const departments = useMemo(() => [...new Set(basePayments.map((p) => p.department))].sort(), []);
+  const years = useMemo(() => [...new Set(basePayments.map((p) => p.paidYear))].sort(), []);
 
-  const filteredCompliance = complianceByProgram.filter((c) => {
-    const matchYear = yearFilter === "all" || c.year === yearFilter;
-    const matchDept = deptFilter === "all" || c.department === deptFilter;
-    return matchYear && matchDept;
-  });
+  const filteredPayments = useMemo(() => {
+    return basePayments.filter((p) => {
+      const matchYear = yearFilter === "all" || p.paidYear === yearFilter;
+      const matchDept = deptFilter === "all" || p.department === deptFilter;
+      return matchYear && matchDept;
+    });
+  }, [yearFilter, deptFilter]);
 
-  const totalCollected = filteredRevenue.reduce((s, r) => s + r.collected, 0);
-  const totalTarget = filteredRevenue.reduce((s, r) => s + r.target, 0);
-  const outstanding = totalTarget - totalCollected;
-  const avgCompliance = filteredCompliance.length ? Math.round(filteredCompliance.reduce((s, c) => s + c.rate, 0) / filteredCompliance.length) : 0;
+  // Real-time computed analytics from payment records
+  const totalCollected = useMemo(() => filteredPayments.reduce((s, p) => s + p.amountPaid, 0), [filteredPayments]);
+  const totalExpected = useMemo(() => filteredPayments.reduce((s, p) => s + p.totalFees, 0), [filteredPayments]);
+  const outstanding = totalExpected - totalCollected;
+  const clearedCount = useMemo(() => filteredPayments.filter((p) => p.amountPaid >= p.totalFees).length, [filteredPayments]);
+  const owingCount = useMemo(() => filteredPayments.filter((p) => p.amountPaid < p.totalFees).length, [filteredPayments]);
+  const complianceRate = filteredPayments.length > 0 ? Math.round((clearedCount / filteredPayments.length) * 100) : 0;
+
+  // Monthly collection chart data - computed from records
+  const monthlyData = useMemo(() => {
+    const monthOrder = ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"];
+    const grouped: Record<string, number> = {};
+    filteredPayments.forEach((p) => {
+      grouped[p.paidMonth] = (grouped[p.paidMonth] || 0) + p.amountPaid;
+    });
+    return monthOrder.filter((m) => grouped[m]).map((m) => ({ month: m, collected: grouped[m] }));
+  }, [filteredPayments]);
+
+  // Compliance by programme - computed from records
+  const complianceByProg = useMemo(() => {
+    const progMap: Record<string, { total: number; cleared: number }> = {};
+    filteredPayments.forEach((p) => {
+      if (!progMap[p.program]) progMap[p.program] = { total: 0, cleared: 0 };
+      progMap[p.program].total++;
+      if (p.amountPaid >= p.totalFees) progMap[p.program].cleared++;
+    });
+    return Object.entries(progMap).map(([program, data]) => ({
+      program,
+      rate: Math.round((data.cleared / data.total) * 100),
+    })).sort((a, b) => b.rate - a.rate);
+  }, [filteredPayments]);
 
   return (
     <DashboardLayout>
       <div className="mb-6">
         <h1 className="text-2xl font-bold font-display text-foreground">Fee Payment Analytics</h1>
-        <p className="text-muted-foreground mt-1">Financial overview and compliance tracking</p>
+        <p className="text-muted-foreground mt-1">Real-time financial overview computed from payment records</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -78,11 +106,11 @@ const FeeAnalytics = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-6">
         {[
-          { label: "Total Collected", value: `₵${totalCollected.toLocaleString()}` },
-          { label: "Outstanding", value: `₵${outstanding.toLocaleString()}` },
-          { label: "Compliance Rate", value: `${avgCompliance}%` },
-          { label: "Defaulters", value: "44" },
-          { label: "Graduates", value: "56" },
+          { label: "Total Collected", value: `GHS ${totalCollected.toLocaleString()}` },
+          { label: "Outstanding", value: `GHS ${outstanding.toLocaleString()}` },
+          { label: "Compliance Rate", value: `${complianceRate}%` },
+          { label: "Defaulters", value: `${owingCount}` },
+          { label: "Cleared", value: `${clearedCount}` },
         ].map((s) => (
           <div key={s.label} className="bg-card rounded-xl border border-border p-5">
             <p className="text-2xl font-bold font-display text-foreground">{s.value}</p>
@@ -94,13 +122,13 @@ const FeeAnalytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-card rounded-xl border border-border p-6">
           <h2 className="font-display text-lg font-bold text-foreground mb-4">Monthly Collections</h2>
-          {filteredRevenue.length > 0 ? (
+          {monthlyData.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={filteredRevenue}>
+              <BarChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `₵${v / 1000}k`} />
-                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => [`₵${v.toLocaleString()}`, ""]} />
+                <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `GHS ${(v / 1000).toFixed(0)}k`} />
+                <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => [`GHS ${v.toLocaleString()}`, ""]} />
                 <Bar dataKey="collected" fill="hsl(var(--secondary))" radius={[6, 6, 0, 0]} name="Collected" />
               </BarChart>
             </ResponsiveContainer>
@@ -110,13 +138,13 @@ const FeeAnalytics = () => {
         </div>
 
         <div className="bg-card rounded-xl border border-border p-6">
-          <h2 className="font-display text-lg font-bold text-foreground mb-4">Compliance by Program</h2>
-          {filteredCompliance.length > 0 ? (
+          <h2 className="font-display text-lg font-bold text-foreground mb-4">Compliance by Programme</h2>
+          {complianceByProg.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={filteredCompliance} layout="vertical">
+              <BarChart data={complianceByProg} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis dataKey="program" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={100} />
+                <YAxis dataKey="program" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} width={120} />
                 <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }} formatter={(v: number) => [`${v}%`, "Rate"]} />
                 <Bar dataKey="rate" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
               </BarChart>
