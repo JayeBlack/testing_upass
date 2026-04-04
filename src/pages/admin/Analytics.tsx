@@ -515,14 +515,14 @@ const Analytics = () => {
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full" style={{ background: PIE_COLORS[0] }} />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{data.graduandsEligible} Eligible</p>
+                  <p className="text-sm font-semibold text-foreground">{displayEligible} Eligible</p>
                   <p className="text-xs text-muted-foreground">{eligiblePct}%</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full" style={{ background: PIE_COLORS[1] }} />
                 <div>
-                  <p className="text-sm font-semibold text-foreground">{data.graduandsIneligible} Ineligible</p>
+                  <p className="text-sm font-semibold text-foreground">{displayIneligible} Ineligible</p>
                   <p className="text-xs text-muted-foreground">{ineligiblePct}%</p>
                 </div>
               </div>
