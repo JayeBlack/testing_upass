@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAdminDepartment } from "@/hooks/use-admin-department";
 
 // --- Academic year data sets ---
 interface YearData {
