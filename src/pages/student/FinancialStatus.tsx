@@ -6,11 +6,14 @@ import umatLogo from "@/assets/umat-logo.png";
 import { useAuth } from "@/contexts/AuthContext";
 
 const fees = [
-  { semester: "Semester 1, 2025/2026", amount: "GH₵ 5,200.00", paid: "GH₵ 5,200.00", balance: "GH₵ 0.00", status: "Paid" },
-  { semester: "Semester 2, 2024/2025", amount: "GH₵ 5,200.00", paid: "GH₵ 5,200.00", balance: "GH₵ 0.00", status: "Paid" },
-  { semester: "Semester 1, 2024/2025", amount: "GH₵ 4,800.00", paid: "GH₵ 4,800.00", balance: "GH₵ 0.00", status: "Paid" },
-  { semester: "Semester 2, 2023/2024", amount: "GH₵ 4,800.00", paid: "GH₵ 3,200.00", balance: "GH₵ 1,600.00", status: "Partial" },
+  { semester: "Semester 1, 2025/2026", totalNum: 5200, paidNum: 5200, status: "Paid" },
+  { semester: "Semester 2, 2024/2025", totalNum: 5200, paidNum: 5200, status: "Paid" },
+  { semester: "Semester 1, 2024/2025", totalNum: 4800, paidNum: 4800, status: "Paid" },
+  { semester: "Semester 2, 2023/2024", totalNum: 4800, paidNum: 3200, status: "Partial" },
 ];
+
+const formatCurrency = (amount: number) => `GHS ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatCurrencyDisplay = (amount: number) => `GH\u20B5 ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const statusConfig: Record<string, { icon: React.ReactNode; className: string }> = {
   Paid: { icon: <CheckCircle size={14} />, className: "bg-success/10 text-success" },
@@ -25,7 +28,6 @@ const FinancialStatus = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const sanitizeAmount = (val: string) => val.replace(/GH₵/g, "GHS");
 
   const handleDownloadReceipt = async (fee: typeof fees[0]) => {
     try {
@@ -122,9 +124,9 @@ const FinancialStatus = () => {
       // Table rows
       const paymentRows = [
         ["Semester", fee.semester],
-        ["Total Fee", sanitizeAmount(fee.amount)],
-        ["Amount Paid", sanitizeAmount(fee.paid)],
-        ["Outstanding Balance", sanitizeAmount(fee.balance)],
+        ["Total Fee", formatCurrency(fee.totalNum)],
+        ["Amount Paid", formatCurrency(fee.paidNum)],
+        ["Outstanding Balance", formatCurrency(fee.totalNum - fee.paidNum)],
       ];
 
       doc.setFont("helvetica", "normal");
@@ -313,9 +315,9 @@ const FinancialStatus = () => {
                 return (
                   <tr key={f.semester} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
                     <td className="px-6 py-4 text-sm font-medium text-foreground">{f.semester}</td>
-                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{f.amount}</td>
-                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{f.paid}</td>
-                    <td className="px-6 py-4 text-sm text-right font-medium text-foreground">{f.balance}</td>
+                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.totalNum)}</td>
+                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.paidNum)}</td>
+                    <td className="px-6 py-4 text-sm text-right font-medium text-foreground">{formatCurrencyDisplay(f.totalNum - f.paidNum)}</td>
                     <td className="px-6 py-4 text-center">
                       <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
                         {cfg.icon}
@@ -348,9 +350,9 @@ const FinancialStatus = () => {
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-xs">
-                <div><p className="text-muted-foreground">Amount</p><p className="font-medium text-foreground">{f.amount}</p></div>
-                <div><p className="text-muted-foreground">Paid</p><p className="font-medium text-foreground">{f.paid}</p></div>
-                <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-foreground">{f.balance}</p></div>
+                <div><p className="text-muted-foreground">Amount</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.totalNum)}</p></div>
+                <div><p className="text-muted-foreground">Paid</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.paidNum)}</p></div>
+                <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.totalNum - f.paidNum)}</p></div>
               </div>
               <button onClick={() => handleDownloadReceipt(f)} className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors">
                 <Download size={14} /> Download Receipt
