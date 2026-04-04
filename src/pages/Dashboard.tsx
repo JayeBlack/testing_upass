@@ -96,7 +96,7 @@ const Dashboard = () => {
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "86%", trend: "up" as const, sub: "+3%" },
   ];
 
-  const roleStatsMap: Record<string, typeof studentStats> = {
+  const roleStatsMap: Record<string, StatItem[]> = {
     Student: studentStats, Supervisor: supervisorStats, Admin: adminStats, Dean: deanStats, Accountant: accountantStats, ExamsOfficer: examsOfficerStats,
   };
   const stats = roleStatsMap[user?.role || "Student"];
