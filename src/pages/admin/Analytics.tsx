@@ -485,7 +485,7 @@ const Analytics = () => {
           <h2 className="font-display text-lg font-bold text-foreground mb-1">Fees Collection Trend</h2>
           <p className="text-xs text-muted-foreground mb-4">Monthly collected vs target (GH₵) — {data.label}</p>
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={data.feesCollection}>
+            <LineChart data={scaledFeesCollection}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(80 12% 88%)" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(120 8% 45%)" />
               <YAxis tick={{ fontSize: 11 }} stroke="hsl(120 8% 45%)" tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
