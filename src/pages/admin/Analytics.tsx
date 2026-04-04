@@ -267,15 +267,90 @@ const Analytics = () => {
   const [selectedYear, setSelectedYear] = useState("2025/2026");
   const navigate = useNavigate();
   const { isSuperAdmin, adminDepartment } = useAdminDepartment();
+  const { students, graduands } = useDataStore();
   const data = academicYears[selectedYear];
 
+  // Department name mapping for matching DataStore departments to chart short names
+  const deptShortName: Record<string, string> = {
+    "Computer Science": "Computer Science",
+    "Mining Engineering": "Mining Eng.",
+    "Electrical Engineering": "Electrical Eng.",
+    "Mechanical Engineering": "Mechanical Eng.",
+  };
+
+  // Filter data by admin's department
+  const deptStudents = adminDepartment
+    ? students.filter((s) => s.department === adminDepartment)
+    : students;
+  const deptGraduands = adminDepartment
+    ? graduands.filter((g) => g.department === adminDepartment)
+    : graduands;
+
+  const realTotalStudents = deptStudents.length;
+  const realActiveStudents = deptStudents.filter((s) => s.status === "Active").length;
+  const realEligibleGraduands = deptGraduands.filter((g) => g.status === "Eligible").length;
+  const realIneligibleGraduands = deptGraduands.filter((g) => g.status === "Ineligible").length;
+  const realTotalGraduands = realEligibleGraduands + realIneligibleGraduands;
+  const realAvgCwa = deptGraduands.length > 0
+    ? (deptGraduands.reduce((a, g) => a + g.cwa, 0) / deptGraduands.length).toFixed(1)
+    : data.avgCwa.toString();
+
+  // Use real data for top-level stats, fallback to mock for charts
+  const displayTotalStudents = realTotalStudents > 0 ? realTotalStudents : data.totalStudents;
+  const displayEligible = realEligibleGraduands > 0 ? realEligibleGraduands : data.graduandsEligible;
+  const displayIneligible = realIneligibleGraduands > 0 ? realIneligibleGraduands : data.graduandsIneligible;
+
+  // Filter enrollment chart data for departmental admins
+  const filteredEnrollmentByDept = adminDepartment
+    ? data.enrollmentByDept.filter((d) => {
+        const shortName = deptShortName[adminDepartment];
+        return d.name === shortName || d.name === adminDepartment;
+      })
+    : data.enrollmentByDept;
+
+  // Filter program breakdown for departmental admins
+  const deptProgramMap: Record<string, string[]> = {
+    "Computer Science": ["MSc. IT", "MPhil CS"],
+    "Mining Engineering": ["MSc. Mining"],
+    "Electrical Engineering": ["MSc. Electrical"],
+    "Mechanical Engineering": ["MSc. Mechanical"],
+  };
+  const filteredProgramBreakdown = adminDepartment
+    ? data.programBreakdown.filter((p) => (deptProgramMap[adminDepartment] || []).includes(p.name))
+    : data.programBreakdown;
+
+  // Scale fees for departmental admins (proportional to their student ratio)
+  const deptRatio = adminDepartment
+    ? (filteredEnrollmentByDept.reduce((a, d) => a + d.students, 0) / data.enrollmentByDept.reduce((a, d) => a + d.students, 0)) || 0.25
+    : 1;
+  const displayFeesCollected = Math.round(data.feesCollected * deptRatio);
+  const displayFeesCleared = Math.round(data.feesCleared * deptRatio);
+  const displayFeesOwing = Math.round(data.feesOwing * deptRatio);
+  const scaledFeesCollection = adminDepartment
+    ? data.feesCollection.map((f) => ({ ...f, collected: Math.round(f.collected * deptRatio), target: Math.round(f.target * deptRatio) }))
+    : data.feesCollection;
+
+  // Scale thesis and CWA for departmental admins
+  const scaledThesisProgress = adminDepartment
+    ? data.thesisProgress.map((t) => ({ ...t, value: Math.round(t.value * deptRatio) }))
+    : data.thesisProgress;
+  const scaledCwaDistribution = adminDepartment
+    ? data.cwaDistribution.map((c) => ({ ...c, count: Math.round(c.count * deptRatio) }))
+    : data.cwaDistribution;
+  const displayThesisDefended = Math.round(data.thesisDefended * deptRatio);
+
+  // Enrollment trend scaled for dept admins
+  const scaledEnrollmentTrend = adminDepartment
+    ? enrollmentTrend.map((e) => ({ ...e, students: Math.round(e.students * deptRatio) }))
+    : enrollmentTrend;
+
   const graduationEligibility = [
-    { name: "Eligible", value: data.graduandsEligible },
-    { name: "Ineligible", value: data.graduandsIneligible },
+    { name: "Eligible", value: displayEligible },
+    { name: "Ineligible", value: displayIneligible },
   ];
-  const totalGraduands = data.graduandsEligible + data.graduandsIneligible;
-  const eligiblePct = ((data.graduandsEligible / totalGraduands) * 100).toFixed(1);
-  const ineligiblePct = ((data.graduandsIneligible / totalGraduands) * 100).toFixed(1);
+  const totalGraduands = displayEligible + displayIneligible;
+  const eligiblePct = totalGraduands > 0 ? ((displayEligible / totalGraduands) * 100).toFixed(1) : "0";
+  const ineligiblePct = totalGraduands > 0 ? ((displayIneligible / totalGraduands) * 100).toFixed(1) : "0";
 
   return (
     <DashboardLayout>
