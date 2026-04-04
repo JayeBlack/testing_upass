@@ -215,8 +215,8 @@ const ChatAssistant = () => {
                 Welcome to SPS Assistant
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                I can help you with postgraduate admissions, programmes, fees,
-                registration, and more at UMaT.
+                I can help you with fees, course registration, thesis submissions,
+                clearance, and other academic matters.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
