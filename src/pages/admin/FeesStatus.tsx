@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { CheckCircle, XCircle, Search, Filter, Upload } from "lucide-react";
 import { useState, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FeeRecord {
   name: string;
