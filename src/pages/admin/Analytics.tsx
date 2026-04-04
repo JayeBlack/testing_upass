@@ -559,8 +559,8 @@ const Analytics = () => {
           <div className="flex items-center gap-4">
             <ResponsiveContainer width="50%" height={220}>
               <PieChart>
-                <Pie data={data.programBreakdown} cx="50%" cy="50%" outerRadius={85} dataKey="value" label={false}>
-                  {data.programBreakdown.map((_, index) => (
+                <Pie data={filteredProgramBreakdown} cx="50%" cy="50%" outerRadius={85} dataKey="value" label={false}>
+                  {filteredProgramBreakdown.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={PROGRAM_COLORS[index % PROGRAM_COLORS.length]} />
                   ))}
                 </Pie>
@@ -568,7 +568,7 @@ const Analytics = () => {
               </PieChart>
             </ResponsiveContainer>
             <div className="space-y-2">
-              {data.programBreakdown.map((p, i) => (
+              {filteredProgramBreakdown.map((p, i) => (
                 <div key={p.name} className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PROGRAM_COLORS[i % PROGRAM_COLORS.length] }} />
                   <span className="text-xs text-muted-foreground">{p.name}</span>
