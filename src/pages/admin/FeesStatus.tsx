@@ -32,6 +32,8 @@ const departments = [...new Set(initialRecords.map((f) => f.department))];
 const programs = [...new Set(initialRecords.map((f) => f.program))];
 
 const FeesStatus = () => {
+  const { user } = useAuth();
+  const isAccountant = user?.role === "Accountant";
   const [records, setRecords] = useState<FeeRecord[]>(initialRecords);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "cleared" | "owing">("all");
