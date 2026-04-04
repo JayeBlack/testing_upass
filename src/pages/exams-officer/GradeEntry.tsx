@@ -102,6 +102,12 @@ const GradeEntry = () => {
     toast({ title: "Results published", description: "Grades are now visible on student portals" });
   };
 
+  const deletePublished = () => {
+    setCwaResults([]);
+    setRows([]);
+    toast({ title: "Results deleted", description: "Published results have been removed" });
+  };
+
   const allValid = rows.length > 0 && rows.every((r) => r.valid);
 
   return (
