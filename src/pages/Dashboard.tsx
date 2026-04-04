@@ -176,14 +176,14 @@ const Dashboard = () => {
             {(user?.role === "Student"
               ? ["Register Courses", "Upload Chapter", "View Results", "Request Documents"]
               : user?.role === "Supervisor"
-              ? ["Review Pending", "Add Remarks", "View Students", "Exam Timetable"]
+              ? ["Review Pending", "Add Remarks", "View Students"]
               : user?.role === "Dean"
               ? ["View Analytics", "Manage Students", "Approve Clearance", "CWA Results"]
               : user?.role === "Accountant"
-              ? ["Fee Analytics", "Student Fees", "Export Reports", "View Analytics"]
+              ? ["Fee Analytics", "Student Fees", "Export Reports", "Fee Notices"]
               : user?.role === "ExamsOfficer"
               ? ["Enter Grades", "Pass List", "Publish Results", "View Analytics"]
-              : ["Enroll Students", "Update Fees", "Generate List", "View Analytics"]
+              : ["Enroll Students", "Update Fees", "Generate List", "System Log"]
             ).map((action) => (
               <button
                 key={action}
