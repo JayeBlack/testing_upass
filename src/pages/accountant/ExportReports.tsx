@@ -1,6 +1,8 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Download, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ExportDropdown from "@/components/ExportDropdown";
+import { exportData } from "@/lib/exportUtils";
 
 const reports = [
   { id: 1, name: "Fee Collection Summary", description: "Total fees collected by program and semester", period: "2023/2024" },
@@ -10,10 +12,10 @@ const reports = [
   { id: 5, name: "Defaulters List", description: "Complete list of students with outstanding fees", period: "2023/2024" },
 ];
 
-const reportData: Record<number, { head: string[][]; body: string[][] }> = {
+const reportData: Record<number, { headers: string[]; rows: string[][] }> = {
   1: {
-    head: [["#", "Program", "Semester", "Students", "Amount Collected (GHS)"]],
-    body: [
+    headers: ["#", "Program", "Semester", "Students", "Amount Collected (GHS)"],
+    rows: [
       ["1", "MSc. IT", "First", "45", "675000.00"],
       ["2", "MSc. IT", "Second", "42", "630000.00"],
       ["3", "MPhil CS", "First", "30", "525000.00"],
@@ -23,8 +25,8 @@ const reportData: Record<number, { head: string[][]; body: string[][] }> = {
     ],
   },
   2: {
-    head: [["#", "Student Name", "Index Number", "Program", "Outstanding (GHS)"]],
-    body: [
+    headers: ["#", "Student Name", "Index Number", "Program", "Outstanding (GHS)"],
+    rows: [
       ["1", "Yaw Frimpong", "UMaT/PG/0178/21", "MSc. IT", "7500.00"],
       ["2", "Kwesi Mensah", "UMaT/PG/0210/22", "MPhil CS", "12000.00"],
       ["3", "Ama Serwaa", "UMaT/PG/0315/22", "MSc. Mining Eng", "5200.00"],
@@ -33,8 +35,8 @@ const reportData: Record<number, { head: string[][]; body: string[][] }> = {
     ],
   },
   3: {
-    head: [["#", "Program", "Total Students", "Paid", "Partial", "Unpaid", "Compliance (%)"]],
-    body: [
+    headers: ["#", "Program", "Total Students", "Paid", "Partial", "Unpaid", "Compliance (%)"],
+    rows: [
       ["1", "MSc. IT", "45", "38", "4", "3", "84.4"],
       ["2", "MPhil CS", "30", "27", "2", "1", "90.0"],
       ["3", "MSc. Mining Eng", "38", "33", "3", "2", "86.8"],
@@ -43,8 +45,8 @@ const reportData: Record<number, { head: string[][]; body: string[][] }> = {
     ],
   },
   4: {
-    head: [["#", "Month", "Collections (GHS)", "Cumulative (GHS)"]],
-    body: [
+    headers: ["#", "Month", "Collections (GHS)", "Cumulative (GHS)"],
+    rows: [
       ["1", "September 2023", "450000.00", "450000.00"],
       ["2", "October 2023", "380000.00", "830000.00"],
       ["3", "November 2023", "290000.00", "1120000.00"],
@@ -54,8 +56,8 @@ const reportData: Record<number, { head: string[][]; body: string[][] }> = {
     ],
   },
   5: {
-    head: [["#", "Student Name", "Index Number", "Program", "Amount Owed (GHS)", "Last Payment"]],
-    body: [
+    headers: ["#", "Student Name", "Index Number", "Program", "Amount Owed (GHS)", "Last Payment"],
+    rows: [
       ["1", "Yaw Frimpong", "UMaT/PG/0178/21", "MSc. IT", "7500.00", "15/09/2023"],
       ["2", "Kwesi Mensah", "UMaT/PG/0210/22", "MPhil CS", "12000.00", "20/10/2023"],
       ["3", "Ama Serwaa", "UMaT/PG/0315/22", "MSc. Mining Eng", "5200.00", "05/11/2023"],
@@ -68,28 +70,24 @@ const reportData: Record<number, { head: string[][]; body: string[][] }> = {
 const ExportReports = () => {
   const { toast } = useToast();
 
-  const handleExportCSV = (report: typeof reports[0]) => {
+  const handleExport = (report: typeof reports[0], format: "csv" | "pdf") => {
     const data = reportData[report.id];
-    const csvContent = [
-      data.head[0].join(","),
-      ...data.body.map((row) => row.map((cell) => `"${cell}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `UMaT_${report.name.replace(/\s+/g, "_")}_${report.period.replace("/", "-")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Report Exported", description: `${report.name} downloaded as CSV` });
+    exportData({
+      title: report.name,
+      subtitle: `Academic Year: ${report.period}`,
+      headers: data.headers,
+      rows: data.rows,
+      fileName: `UMaT_${report.name.replace(/\s+/g, "_")}_${report.period.replace("/", "-")}`,
+      format,
+    });
+    toast({ title: "Report Exported", description: `${report.name} downloaded as ${format.toUpperCase()}` });
   };
 
   return (
     <DashboardLayout>
       <div className="mb-6">
         <h1 className="text-2xl font-bold font-display text-foreground">Export Financial Reports</h1>
-        <p className="text-muted-foreground mt-1">Generate and download financial reports in CSV format</p>
+        <p className="text-muted-foreground mt-1">Generate and download financial reports in CSV or PDF format</p>
       </div>
 
       <div className="space-y-4">
@@ -105,9 +103,7 @@ const ExportReports = () => {
                 <p className="text-xs text-muted-foreground mt-0.5">Academic Year: {r.period}</p>
               </div>
             </div>
-            <button onClick={() => handleExportCSV(r)} className="flex items-center gap-2 px-4 py-2 rounded-lg gradient-gold text-secondary-foreground text-xs font-medium hover:opacity-90 transition-opacity shrink-0">
-              <Download size={14} /> Download CSV
-            </button>
+            <ExportDropdown onExport={(format) => handleExport(r, format)} label="Download" compact />
           </div>
         ))}
       </div>

@@ -1,9 +1,10 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Download } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
 import { useDataStore } from "@/contexts/DataStoreContext";
+import ExportDropdown from "@/components/ExportDropdown";
+import { exportData } from "@/lib/exportUtils";
 
 const PassList = () => {
   const { graduands } = useDataStore();
@@ -27,19 +28,19 @@ const PassList = () => {
     return matchesDept && matchesProg && matchesYear && matchesStatus;
   });
 
-  const handleExportCSV = () => {
-    const csvContent = [
-      "Name,Index Number,Programme,Department,CWA,Eligibility",
-      ...filtered.map((g) => `${g.name},${g.index},${g.program},${g.department},${g.cwa.toFixed(1)},${g.status}`),
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `UMaT_Pass_List${yearFilter !== "all" ? `_${yearFilter}` : ""}${deptFilter !== "all" ? `_${deptFilter.replace(/\s+/g, "_")}` : ""}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "CSV exported", description: "Pass list has been downloaded" });
+  const handleExport = (format: "csv" | "pdf") => {
+    const headers = ["Name", "Index Number", "Programme", "Department", "CWA", "Eligibility"];
+    const rows = filtered.map((g) => [g.name, g.index, g.program, g.department, g.cwa.toFixed(1), g.status]);
+    const suffix = `${yearFilter !== "all" ? `_${yearFilter}` : ""}${deptFilter !== "all" ? `_${deptFilter.replace(/\s+/g, "_")}` : ""}`;
+    exportData({
+      title: "Pass List",
+      subtitle: `Academic Year: ${yearFilter !== "all" ? yearFilter : "All Years"}`,
+      headers,
+      rows,
+      fileName: `UMaT_Pass_List${suffix}`,
+      format,
+    });
+    toast({ title: `${format.toUpperCase()} exported`, description: "Pass list has been downloaded" });
   };
 
   return (
@@ -51,9 +52,7 @@ const PassList = () => {
             {isSuperAdmin ? "Graduands eligible for convocation" : `${adminDepartment} — Graduands eligible for convocation`}
           </p>
         </div>
-        <button onClick={handleExportCSV} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
-          <Download size={14} /> Export CSV
-        </button>
+        <ExportDropdown onExport={handleExport} />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">

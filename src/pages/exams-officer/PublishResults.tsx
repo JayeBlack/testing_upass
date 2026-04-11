@@ -1,7 +1,9 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Eye, CheckCircle, Clock, Trash2, Download } from "lucide-react";
+import { Send, Eye, CheckCircle, Clock, Trash2 } from "lucide-react";
+import ExportDropdown from "@/components/ExportDropdown";
+import { exportData } from "@/lib/exportUtils";
 
 interface ResultBatch {
   id: string;
@@ -41,19 +43,16 @@ const PublishResults = () => {
     toast({ title: "Results deleted", description: `${batch?.program} ${batch?.semester} results have been removed` });
   };
 
-  const handleDownload = (batch: ResultBatch) => {
-    const csvContent = [
-      "Programme,Semester,Year,Department,Students,Status,Published Date",
-      `${batch.program},${batch.semester},${batch.year},${batch.department},${batch.studentCount},${batch.status},${batch.publishedAt || "N/A"}`,
-    ].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Results_${batch.program.replace(/\s+/g, "_")}_${batch.semester.replace(/\s+/g, "_")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: "Downloaded", description: `${batch.program} results downloaded` });
+  const handleDownload = (batch: ResultBatch, format: "csv" | "pdf") => {
+    exportData({
+      title: `${batch.program} Results`,
+      subtitle: `${batch.semester} — ${batch.year} | ${batch.department}`,
+      headers: ["Programme", "Semester", "Year", "Department", "Students", "Status", "Published Date"],
+      rows: [[batch.program, batch.semester, batch.year, batch.department, String(batch.studentCount), batch.status, batch.publishedAt || "N/A"]],
+      fileName: `Results_${batch.program.replace(/\s+/g, "_")}_${batch.semester.replace(/\s+/g, "_")}`,
+      format,
+    });
+    toast({ title: "Downloaded", description: `${batch.program} results downloaded as ${format.toUpperCase()}` });
   };
 
   const drafts = batches.filter((b) => b.status === "Draft");
@@ -66,7 +65,6 @@ const PublishResults = () => {
         <p className="text-muted-foreground mt-1">Review and publish result batches to student portals</p>
       </div>
 
-      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-card rounded-2xl border border-border p-6 max-w-sm w-full shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
@@ -145,9 +143,7 @@ const PublishResults = () => {
                   <td className="px-6 py-4 text-sm text-center text-muted-foreground">{b.publishedAt}</td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => handleDownload(b)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Download results">
-                        <Download size={16} />
-                      </button>
+                      <ExportDropdown onExport={(format) => handleDownload(b, format)} label="Download" compact />
                       <button onClick={() => setDeleteConfirm(b.id)} className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Delete results">
                         <Trash2 size={16} />
                       </button>
