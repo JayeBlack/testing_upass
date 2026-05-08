@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 
-export type UserRole = "Student" | "Supervisor" | "Admin" | "Dean" | "Accountant" | "ExamsOfficer";
+export type UserRole =
+  | "Student"
+  | "Supervisor"
+  | "Admin"
+  | "Dean"
+  | "ViceDean"
+  | "Registrar"
+  | "AdminAssistant"
+  | "Accountant"
+  | "AccountingAssistant"
+  | "ExamsOfficer";
 
 export interface User {
   id: string;
@@ -112,6 +122,46 @@ const mockUsers: Record<string, User> = {
     department: "School of Postgraduate Studies",
     avatarUrl: "https://images.unsplash.com/photo-1551836022-deb4988cc6c0?w=150&h=150&fit=crop&crop=face",
   },
+  ViceDean: {
+    id: "vd1",
+    email: "vicedean@umat.edu.gh",
+    name: "Assoc Prof Peter Ekow Baffoe",
+    role: "ViceDean",
+    department: "School of Postgraduate Studies",
+    avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&h=150&fit=crop&crop=face",
+  },
+  Registrar: {
+    id: "reg1",
+    email: "registrar@umat.edu.gh",
+    name: "Mr Francis Nyarko",
+    role: "Registrar",
+    department: "School of Postgraduate Studies",
+    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+  },
+  AssistantRegistrar: {
+    id: "areg1",
+    email: "asstregistrar@umat.edu.gh",
+    name: "Mr Michael Fynn Hammond",
+    role: "Registrar",
+    department: "School of Postgraduate Studies",
+    avatarUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+  },
+  AdminAssistant: {
+    id: "aa1",
+    email: "adminassistant@umat.edu.gh",
+    name: "Ms Anita Awuki Akunor",
+    role: "AdminAssistant",
+    department: "School of Postgraduate Studies",
+    avatarUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop&crop=face",
+  },
+  AccountingAssistant: {
+    id: "aca1",
+    email: "accountingassistant@umat.edu.gh",
+    name: "Ms Candy Brew",
+    role: "AccountingAssistant",
+    department: "Finance Office",
+    avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&h=150&fit=crop&crop=face",
+  },
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -139,7 +189,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (lowerEmail.includes("dean")) {
-      setUser(mockUsers.Dean);
+      if (lowerEmail.includes("vice")) setUser(mockUsers.ViceDean);
+      else setUser(mockUsers.Dean);
+    } else if (lowerEmail.includes("vicedean")) {
+      setUser(mockUsers.ViceDean);
+    } else if (lowerEmail.includes("asstregistrar") || lowerEmail.includes("assistantregistrar")) {
+      setUser(mockUsers.AssistantRegistrar);
+    } else if (lowerEmail.includes("registrar")) {
+      setUser(mockUsers.Registrar);
+    } else if (lowerEmail.includes("adminassistant")) {
+      setUser(mockUsers.AdminAssistant);
+    } else if (lowerEmail.includes("accountingassistant")) {
+      setUser(mockUsers.AccountingAssistant);
     } else if (lowerEmail.includes("accountant") || lowerEmail.includes("finance")) {
       setUser(mockUsers.Accountant);
     } else if (lowerEmail.includes("supervisor") || lowerEmail.includes("sup")) {
