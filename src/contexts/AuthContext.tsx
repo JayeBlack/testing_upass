@@ -91,7 +91,7 @@ const mockUsers: Record<string, User> = {
   Dean: {
     id: "d1",
     email: "dean@umat.edu.gh",
-    name: "Prof. Ama Boateng",
+    name: "Assoc Prof Solomon Nunoo",
     role: "Dean",
     department: "School of Postgraduate Studies",
     avatarUrl: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&h=150&fit=crop&crop=face",
@@ -99,7 +99,7 @@ const mockUsers: Record<string, User> = {
   Accountant: {
     id: "acc1",
     email: "accountant@umat.edu.gh",
-    name: "Mr. Yaw Darko",
+    name: "Mr Thomas Kwame Nkrumah",
     role: "Accountant",
     department: "Finance Office",
     avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&h=150&fit=crop&crop=face",
