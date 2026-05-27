@@ -199,7 +199,7 @@ const ReviewSubmissions = () => {
                   <XCircle size={14} className="mr-1.5" /> Reject
                 </Button>
                 <Button onClick={() => submitReview("Reviewed")} disabled={saving || !newRemark.trim()} variant="outline">
-                  <Send size={14} className="mr-1.5" /> Save Feedback
+                  <Send size={14} className="mr-1.5" /> Send Feedback
                 </Button>
               </div>
             </div>
