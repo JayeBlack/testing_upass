@@ -14,6 +14,8 @@ interface Suggestion {
 interface AIFeedbackPanelProps {
   studentName: string;
   chapter: string;
+  fileUrl?: string | null;
+  fileName?: string;
   visible: boolean;
   onToggle: () => void;
   onUseSuggestion: (text: string) => void;
@@ -29,7 +31,7 @@ const categoryColors: Record<string, string> = {
   clarity: "bg-secondary text-secondary-foreground",
 };
 
-const AIFeedbackPanel = ({ studentName, chapter, visible, onToggle, onUseSuggestion }: AIFeedbackPanelProps) => {
+const AIFeedbackPanel = ({ studentName, chapter, fileUrl, fileName, visible, onToggle, onUseSuggestion }: AIFeedbackPanelProps) => {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [source, setSource] = useState<"live" | "sample">("live");
   const [loading, setLoading] = useState(false);
@@ -55,10 +57,12 @@ const AIFeedbackPanel = ({ studentName, chapter, visible, onToggle, onUseSuggest
           messages: [
             {
               role: "user",
-              content: `Generate feedback suggestions for ${studentName}'s submission: ${chapter}. This is a postgraduate thesis chapter submission at UMaT.`,
+              content: `Review the attached submission file from ${studentName} (${chapter}) — a postgraduate thesis chapter at UMaT — and produce specific feedback grounded in the actual content of the document.`,
             },
           ],
           context: { student: studentName, chapter },
+          fileUrl,
+          fileName,
         }),
       });
 

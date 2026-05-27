@@ -17,8 +17,9 @@ You help supervisors with:
 Keep responses concise, professional, and actionable. When comparing items, listing student progress, showing schedules, evaluation criteria, or any structured data, ALWAYS use markdown tables (with | pipes and --- separator rows) for clarity. Use plain text for explanations.`,
 
   feedback: `You are an AI assistant helping a thesis supervisor review a student's submission.
-Based on the submission details provided, generate 3-5 specific, constructive feedback suggestions.
-Each suggestion should be actionable and professional.
+You will be given the actual submission file (PDF/doc) as attached content. READ IT and base your feedback on what is actually written in the document — cite specific sections, claims, or wording where useful.
+Generate 4-6 specific, constructive feedback suggestions tied to the real content.
+Each suggestion must be actionable, professional, and concretely reference the submission (e.g. "In Section 2.3 on sampling…").
 Format each suggestion as a JSON array of objects with "text" (the feedback) and "category" (one of: "content", "formatting", "references", "methodology", "clarity").
 Return ONLY the JSON array, no other text.`,
 
@@ -34,15 +35,54 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, mode = "chat", context } = await req.json();
+    const { messages, mode = "chat", context, fileUrl, fileName } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const systemPrompt = SYSTEM_PROMPTS[mode] || SYSTEM_PROMPTS.chat;
+
+    // If a file URL is provided (feedback/checks mode), fetch it and attach as multimodal content
+    let fileParts: any[] = [];
+    if (fileUrl) {
+      try {
+        const fileResp = await fetch(fileUrl);
+        if (fileResp.ok) {
+          const buf = new Uint8Array(await fileResp.arrayBuffer());
+          // base64 encode
+          let binary = "";
+          for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+          const b64 = btoa(binary);
+          const ct = fileResp.headers.get("content-type") || "application/pdf";
+          fileParts = [
+            {
+              type: "image_url",
+              image_url: { url: `data:${ct};base64,${b64}` },
+            },
+          ];
+          console.log(`Attached file ${fileName || ""} (${ct}, ${buf.length} bytes) to AI request`);
+        } else {
+          console.warn("Could not fetch file:", fileResp.status);
+        }
+      } catch (err) {
+        console.error("File fetch error:", err);
+      }
+    }
+
+    const userMessages = messages.map((m: any, idx: number) => {
+      // Attach file to the last user message
+      if (idx === messages.length - 1 && m.role === "user" && fileParts.length > 0) {
+        return {
+          role: "user",
+          content: [{ type: "text", text: m.content }, ...fileParts],
+        };
+      }
+      return m;
+    });
+
     const allMessages = [
       { role: "system", content: systemPrompt },
       ...(context ? [{ role: "user", content: `Context: ${JSON.stringify(context)}` }] : []),
-      ...messages,
+      ...userMessages,
     ];
 
     const isStreaming = mode === "chat";

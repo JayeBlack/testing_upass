@@ -38,6 +38,7 @@ const ReviewSubmissions = () => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [publicFileUrl, setPublicFileUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [previewWidth, setPreviewWidth] = useState(720);
   const [preparingDownload, setPreparingDownload] = useState(false);
@@ -85,6 +86,7 @@ const ReviewSubmissions = () => {
     setNewRemark(sub.feedback || "");
     setFileUrl(null);
     setDownloadUrl(null);
+    setPublicFileUrl(null);
     setNumPages(null);
     setPreparingDownload(true);
     try {
@@ -93,6 +95,8 @@ const ReviewSubmissions = () => {
       const objectUrl = URL.createObjectURL(data);
       setFileUrl(objectUrl);
       setDownloadUrl(objectUrl);
+      const { data: pub } = supabase.storage.from("thesis-files").getPublicUrl(sub.file_path);
+      setPublicFileUrl(pub.publicUrl);
     } catch (err: any) {
       toast({ title: "File preparation failed", description: err.message, variant: "destructive" });
     } finally {
@@ -263,6 +267,8 @@ const ReviewSubmissions = () => {
               <AIFeedbackPanel
                 studentName={selectedSubmission.student_name}
                 chapter={selectedSubmission.stage}
+                fileUrl={publicFileUrl}
+                fileName={selectedSubmission.file_name}
                 visible={showAI}
                 onToggle={() => setShowAI(!showAI)}
                 onUseSuggestion={(text) => setNewRemark((prev) => (prev ? prev + "\n\n" + text : text))}
