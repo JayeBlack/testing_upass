@@ -51,11 +51,28 @@ const ReviewSubmissions = () => {
     setSelectedSubmission(sub);
     setNewRemark(sub.feedback || "");
     setFileUrl(null);
-    const { data, error } = await supabase.storage
-      .from("thesis-files")
-      .createSignedUrl(sub.file_path, 3600);
-    if (error) toast({ title: "Could not load file", description: error.message, variant: "destructive" });
-    else setFileUrl(data.signedUrl);
+    const { data } = supabase.storage.from("thesis-files").getPublicUrl(sub.file_path);
+    setFileUrl(data.publicUrl);
+  };
+
+  const handleDownload = async () => {
+    if (!selectedSubmission) return;
+    try {
+      const { data, error } = await supabase.storage
+        .from("thesis-files")
+        .download(selectedSubmission.file_path);
+      if (error || !data) throw error || new Error("No file");
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = selectedSubmission.file_name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast({ title: "Download failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const submitReview = async (status: "Approved" | "Rejected" | "Reviewed") => {
@@ -140,11 +157,16 @@ const ReviewSubmissions = () => {
                   <FileText size={16} className="text-muted-foreground shrink-0" />
                   <span className="text-sm font-medium text-foreground truncate">{selectedSubmission.file_name}</span>
                 </div>
-                {fileUrl && (
-                  <a href={fileUrl} target="_blank" rel="noreferrer" className="shrink-0">
-                    <Button variant="outline" size="sm"><Download size={14} className="mr-1.5" />Download</Button>
-                  </a>
-                )}
+                <div className="flex items-center gap-2 shrink-0">
+                  {fileUrl && (
+                    <a href={fileUrl} target="_blank" rel="noreferrer">
+                      <Button variant="outline" size="sm"><Eye size={14} className="mr-1.5" />Open</Button>
+                    </a>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleDownload}>
+                    <Download size={14} className="mr-1.5" />Download
+                  </Button>
+                </div>
               </div>
               <div className="h-[600px] bg-muted/10">
                 {fileUrl ? (
