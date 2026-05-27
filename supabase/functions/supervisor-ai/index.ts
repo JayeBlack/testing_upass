@@ -48,18 +48,31 @@ serve(async (req) => {
         const fileResp = await fetch(fileUrl);
         if (fileResp.ok) {
           const buf = new Uint8Array(await fileResp.arrayBuffer());
-          // base64 encode
-          let binary = "";
-          for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
-          const b64 = btoa(binary);
-          const ct = fileResp.headers.get("content-type") || "application/pdf";
-          fileParts = [
-            {
-              type: "image_url",
-              image_url: { url: `data:${ct};base64,${b64}` },
-            },
-          ];
-          console.log(`Attached file ${fileName || ""} (${ct}, ${buf.length} bytes) to AI request`);
+          const ct = (fileResp.headers.get("content-type") || "").toLowerCase();
+          const name = (fileName || fileUrl).toLowerCase();
+          const isPdf = ct.includes("pdf") || name.endsWith(".pdf");
+          const isImg = ct.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/.test(name);
+          if (isPdf || isImg) {
+            let binary = "";
+            for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+            const b64 = btoa(binary);
+            const mime = isPdf ? "application/pdf" : (ct || "image/png");
+            fileParts = [{ type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } }];
+            console.log(`Attached file ${fileName || ""} (${mime}, ${buf.length} bytes)`);
+          } else {
+            // Unsupported (e.g. .docx) — try to extract plain text fallback
+            try {
+              const text = new TextDecoder("utf-8", { fatal: false }).decode(buf).replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ").replace(/\s+/g, " ").slice(0, 20000);
+              if (text.trim().length > 200) {
+                fileParts = [{ type: "text", text: `\n\n--- Submission file (${fileName}) extracted text (truncated) ---\n${text}` }];
+                console.log(`Attached extracted text for ${fileName} (${text.length} chars)`);
+              } else {
+                console.warn(`Unsupported file type ${ct} for ${fileName}; no text extractable`);
+              }
+            } catch (e) {
+              console.warn("Text extract failed", e);
+            }
+          }
         } else {
           console.warn("Could not fetch file:", fileResp.status);
         }
