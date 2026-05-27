@@ -1,14 +1,21 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FileText, CheckCircle, Clock, Eye, Send, MessageSquare, ArrowLeft, Bot, Download, XCircle, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FileText, CheckCircle, Clock, Eye, Send, ArrowLeft, Bot, Download, XCircle, Loader2, FileWarning } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import AIFeedbackPanel from "@/components/supervisor/AIFeedbackPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 interface Submission {
   id: string;
@@ -31,10 +38,13 @@ const ReviewSubmissions = () => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [previewWidth, setPreviewWidth] = useState(720);
   const [preparingDownload, setPreparingDownload] = useState(false);
   const [newRemark, setNewRemark] = useState("");
   const [saving, setSaving] = useState(false);
   const [showAI, setShowAI] = useState(true);
+  const previewRef = useRef<HTMLDivElement | null>(null);
 
   const loadSubmissions = async () => {
     setLoading(true);
@@ -55,11 +65,27 @@ const ReviewSubmissions = () => {
     };
   }, [downloadUrl]);
 
+  useEffect(() => {
+    const previewElement = previewRef.current;
+    if (!previewElement) return;
+
+    const updatePreviewWidth = () => {
+      setPreviewWidth(Math.max(280, Math.min(previewElement.clientWidth - 32, 900)));
+    };
+
+    updatePreviewWidth();
+    const observer = new ResizeObserver(updatePreviewWidth);
+    observer.observe(previewElement);
+
+    return () => observer.disconnect();
+  }, [selectedSubmission, showAI]);
+
   const openSubmission = async (sub: Submission) => {
     setSelectedSubmission(sub);
     setNewRemark(sub.feedback || "");
     setFileUrl(null);
     setDownloadUrl(null);
+    setNumPages(null);
     setPreparingDownload(true);
     try {
       const { data, error } = await supabase.storage.from("thesis-files").download(sub.file_path);
@@ -171,9 +197,35 @@ const ReviewSubmissions = () => {
                   )}
                 </div>
               </div>
-              <div className="h-[600px] bg-muted/10">
+              <div ref={previewRef} className="h-[600px] overflow-auto bg-muted/10 px-4 py-5">
                 {fileUrl ? (
-                  <iframe src={fileUrl} title={selectedSubmission.file_name} className="w-full h-full" />
+                  <Document
+                    file={fileUrl}
+                    loading={
+                      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                        <Loader2 size={20} className="animate-spin mr-2" /> Loading preview...
+                      </div>
+                    }
+                    error={
+                      <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground text-sm text-center">
+                        <FileWarning size={28} />
+                        <span>Preview unavailable. Please download the file to view it.</span>
+                      </div>
+                    }
+                    onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                  >
+                    <div className="flex flex-col items-center gap-4">
+                      {Array.from(new Array(numPages || 0), (_el, index) => (
+                        <Page
+                          key={`page_${index + 1}`}
+                          pageNumber={index + 1}
+                          width={previewWidth}
+                          renderAnnotationLayer={false}
+                          className="overflow-hidden rounded-md border border-border shadow-sm"
+                        />
+                      ))}
+                    </div>
+                  </Document>
                 ) : (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     <Loader2 size={20} className="animate-spin mr-2" /> Loading document...
