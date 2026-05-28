@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
+import { readSheetFile, SHEET_ACCEPT } from "@/lib/sheet-import";
 
 interface FeeRecord {
   name: string;
@@ -60,10 +61,9 @@ const FeesStatus = () => {
     );
   };
 
-  const parsePaymentCSV = (text: string): FeeRecord[] => {
-    const lines = text.trim().split("\n");
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
+  const parsePaymentRows = (rows: string[][]): FeeRecord[] => {
+    if (rows.length < 2) return [];
+    const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/"/g, ""));
     const nameIdx = headers.findIndex((h) => h.includes("name") || h.includes("student"));
     const indexIdx = headers.findIndex((h) => h.includes("index") || h.includes("id") || h.includes("number"));
     const deptIdx = headers.findIndex((h) => h.includes("department") || h.includes("dept"));
@@ -71,8 +71,7 @@ const FeesStatus = () => {
     const totalIdx = headers.findIndex((h) => h.includes("total") || h.includes("fee"));
     const paidIdx = headers.findIndex((h) => h.includes("paid") || h.includes("amount"));
 
-    return lines.slice(1).filter((l) => l.trim()).map((line) => {
-      const cols = line.split(",").map((c) => c.trim().replace(/"/g, ""));
+    return rows.slice(1).filter((r) => r.some((c) => c !== "")).map((cols) => {
       const totalFees = parseFloat(cols[totalIdx >= 0 ? totalIdx : 4] || "0") || 0;
       const amountPaid = parseFloat(cols[paidIdx >= 0 ? paidIdx : 5] || "0") || 0;
       return {
@@ -88,27 +87,23 @@ const FeesStatus = () => {
     }).filter((r) => r.name && r.index);
   };
 
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.name.endsWith(".csv")) {
-      toast({ title: "Invalid format", description: "Please upload a CSV file", variant: "destructive" });
-      e.target.value = "";
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const parsed = parsePaymentCSV(text);
+    try {
+      const rows = await readSheetFile(file);
+      const parsed = parsePaymentRows(rows);
       if (parsed.length === 0) {
         toast({ title: "Import failed", description: "Could not parse records. Ensure columns include Name, Index Number, Department, Programme, Total Fees, Amount Paid.", variant: "destructive" });
+        e.target.value = "";
         return;
       }
       setImportPreview(parsed);
       setShowImport(false);
       toast({ title: "File parsed", description: `${parsed.length} payment records ready to import` });
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast({ title: "Invalid file", description: (err as Error).message, variant: "destructive" });
+    }
     e.target.value = "";
   };
 
@@ -163,7 +158,7 @@ const FeesStatus = () => {
             onClick={() => setShowImport(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
           >
-            <Upload size={14} /> Import Manual Payments (.csv)
+            <Upload size={14} /> Import Manual Payments
           </button>
         )}
       </div>
@@ -173,16 +168,16 @@ const FeesStatus = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setShowImport(false)}>
           <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-display text-lg font-bold text-foreground mb-2">Import Manual Payments</h3>
-            <p className="text-sm text-muted-foreground mb-4">Upload a CSV file containing the list of students who made payments manually at their respective departments. The system will read the file and add payments to the history by department.</p>
+            <p className="text-sm text-muted-foreground mb-4">Upload a CSV or Excel file containing the list of students who made payments manually at their respective departments. The system will read the file and add payments to the history by department.</p>
             <p className="text-xs text-muted-foreground mb-3">Expected columns: Student Name, Index Number, Department, Programme, Total Fees, Amount Paid</p>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+            <input ref={fileRef} type="file" accept={SHEET_ACCEPT} className="hidden" onChange={handleImportFile} />
             <div
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary/50 transition-colors"
             >
               <Upload size={28} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-foreground font-medium">Click to upload CSV file</p>
-              <p className="text-xs text-muted-foreground mt-1">Only .csv format accepted</p>
+              <p className="text-sm text-foreground font-medium">Click to upload CSV or Excel file</p>
+              <p className="text-xs text-muted-foreground mt-1">Accepted: .csv, .xlsx, .xls</p>
             </div>
             <button onClick={() => setShowImport(false)} className="w-full mt-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
           </div>

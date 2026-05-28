@@ -2,6 +2,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Plus, Trash2, CheckCircle, AlertTriangle, FileText } from "lucide-react";
+import { readSheetFile, SHEET_ACCEPT } from "@/lib/sheet-import";
 
 interface GradeRow {
   id: string;
@@ -75,17 +76,16 @@ const GradeEntry = () => {
 
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target?.result as string;
-      const lines = text.split("\n").filter((l) => l.trim());
-      const newRows: GradeRow[] = lines.slice(1).map((line, i) => {
-        const [indexNumber = "", studentName = "", courseName = "", credits = "", marks = ""] = line.split(",").map((s) => s.trim());
+    try {
+      const rows = await readSheetFile(file);
+      const dataRows = rows.slice(1).filter((r) => r.some((c) => c !== ""));
+      const newRows: GradeRow[] = dataRows.map((cols, i) => {
+        const [indexNumber = "", studentName = "", courseName = "", credits = "", marks = ""] = cols;
         const { valid, errors } = validateRow({ indexNumber, studentName, courseName, credits, marks });
-        return { id: `csv${i}${Date.now()}`, indexNumber, studentName, courseName, credits, marks, valid, errors };
+        return { id: `imp${i}${Date.now()}`, indexNumber, studentName, courseName, credits, marks, valid, errors };
       });
       setRows((prev) => [...prev, ...newRows]);
       const invalidCount = newRows.filter((r) => !r.valid).length;
@@ -93,8 +93,9 @@ const GradeEntry = () => {
         title: `${newRows.length} rows imported`,
         description: invalidCount > 0 ? `${invalidCount} rows have validation errors` : "All rows validated successfully",
       });
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      toast({ title: "Import failed", description: (err as Error).message, variant: "destructive" });
+    }
     e.target.value = "";
   };
 
@@ -151,9 +152,9 @@ const GradeEntry = () => {
           <p className="text-muted-foreground mt-1">Enter marks (0–100); grade and CWA are computed automatically</p>
         </div>
         <div className="flex gap-3">
-          <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+          <input ref={fileRef} type="file" accept={SHEET_ACCEPT} className="hidden" onChange={handleCSVUpload} />
           <button onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-            <Upload size={14} /> Upload CSV
+            <Upload size={14} /> Upload CSV / Excel
           </button>
           <button onClick={addRow} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
             <Plus size={14} /> Add Row
@@ -164,7 +165,7 @@ const GradeEntry = () => {
       <div className="mb-3 p-3 rounded-lg bg-muted/40 border border-border text-xs text-muted-foreground flex items-start gap-2">
         <FileText size={14} className="mt-0.5 shrink-0" />
         <div>
-          <p><span className="font-semibold text-foreground">CSV format:</span> index_number, student_name, course_name, credit_hours, marks</p>
+          <p><span className="font-semibold text-foreground">File format (.csv, .xlsx, .xls):</span> index_number, student_name, course_name, credit_hours, marks</p>
           <p className="mt-1"><span className="font-semibold text-foreground">UMaT grading:</span> 80–100 A · 70–79 B · 60–69 C · 50–59 D · 0–49 F</p>
         </div>
       </div>
