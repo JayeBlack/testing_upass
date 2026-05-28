@@ -33,3 +33,36 @@
 ### Notes
 - Supervisor: No changes, just inspection
 - All download format changes from PDF to CSV should be applied consistently across admin pages
+
+---
+
+## Phase 6: Accountant CSV & Bank Payment Workflow
+
+### 6.1 Fee List CSV (accountant publishes)
+- **One row per student.** Single fee item = school fees (GH₵, with pesewas, decimal e.g. `4250.50`).
+- **Columns:** `index_number, full_name, programme, level, academic_year, semester, total_fee_ghs`
+  - `index_number` is the match key (`UMaT/PG/XXXX/YY`)
+  - `programme` included for grouping/validation; mismatches against student record are flagged but do not block import
+- **Re-upload behaviour:**
+  - Existing student (matched by index) → update `total_fee_ghs`; recompute `outstanding = total − paid_so_far`
+  - New student in CSV → create fee record
+  - Student in system but missing from CSV → leave untouched, surface in a "not in latest list" report
+  - Show a diff preview (added / updated / unchanged / removed) before commit
+- Validation: index format, programme exists, amount > 0, no duplicate index in file.
+
+### 6.2 Bank Payment CSV (manual today, real API later)
+- Students pay at the bank; accountant uploads the bank's payment file to update fee status.
+- **Columns:** `teller_no, paid_at, index_number, amount_ghs, bank_branch, narration`
+- **Auto-match by index number** = system finds the fee record whose `index_number` matches the row and credits `amount_ghs` against it. No manual linking needed for clean rows.
+- Payments are full payments for now; partial logic deferred until requirement changes.
+- Unmatched rows (unknown index, duplicate teller_no, amount mismatch) land in an exceptions queue for the accountant to resolve manually.
+- On successful match: payment recorded, `amount_paid` increased, `is_cleared` flips when fully paid, student sees updated Financial Status + notification.
+
+### 6.3 Service boundary (swap-ready)
+- `src/services/paymentsProvider.ts` exposes `fetchBankPayments()`.
+- **Today:** parses the uploaded bank CSV.
+- **Tomorrow:** body swapped to call the school's bank API. No other file changes.
+- The accountant still triggers the sync; the real API just removes the upload step.
+
+### 6.4 Out of scope (Phase 6)
+- Hubtel / MoMo / Paystack online payment providers — removed from roadmap.
