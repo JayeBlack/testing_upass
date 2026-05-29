@@ -29,6 +29,8 @@ import FeesStatus from "./pages/admin/FeesStatus";
 import PassList from "./pages/admin/PassList";
 import Analytics from "./pages/admin/Analytics";
 import SystemLog from "./pages/admin/SystemLog";
+import ManageUsers from "./pages/admin/ManageUsers";
+import SupervisorAssignments from "./pages/admin/SupervisorAssignments";
 import ClearanceApprovals from "./pages/dean/ClearanceApprovals";
 import CWAResults from "./pages/dean/CWAResults";
 import FeeAnalytics from "./pages/accountant/FeeAnalytics";
@@ -70,6 +72,8 @@ const App = () => (
             <Route path="/admin/passlist" element={<PassList />} />
             <Route path="/admin/analytics" element={<Analytics />} />
             <Route path="/admin/log" element={<SystemLog />} />
+            <Route path="/admin/users" element={<ManageUsers />} />
+            <Route path="/admin/assignments" element={<SupervisorAssignments />} />
             {/* Dean */}
             <Route path="/dean/clearance" element={<ClearanceApprovals />} />
             <Route path="/dean/results" element={<CWAResults />} />

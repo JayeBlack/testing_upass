@@ -20,6 +20,9 @@ import {
   Send,
   LogOut,
   ChevronRight,
+  ShieldCheck,
+  UserCog,
+  Link2,
 } from "lucide-react";
 import umatLogo from "@/assets/umat-logo.png";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -117,7 +120,15 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
 
   if (!user) return null;
 
-  const items = navByRole[user.role];
+  const baseItems = navByRole[user.role];
+  const superAdminExtras: NavItem[] =
+    user.isSuperAdmin
+      ? [
+          { label: "Manage Users", path: "/admin/users", icon: <UserCog size={18} /> },
+          { label: "Supervisor Assignments", path: "/admin/assignments", icon: <Link2 size={18} /> },
+        ]
+      : [];
+  const items = [...baseItems, ...superAdminExtras];
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -150,7 +161,13 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">{user.name}</p>
-            <p className="text-[11px] text-sidebar-foreground/50 truncate">{user.role === "Admin" && user.department ? user.department : user.role}</p>
+            <p className="text-[11px] text-sidebar-foreground/50 truncate flex items-center gap-1">
+              {user.isSuperAdmin ? (
+                <><ShieldCheck size={11} className="text-secondary" /> Super Admin</>
+              ) : (
+                user.role === "Admin" && user.department ? user.department : user.role
+              )}
+            </p>
           </div>
         </div>
       </div>
