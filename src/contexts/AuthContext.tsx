@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+
+const AUTH_STORAGE_KEY = "umat_sps_auth_user";
 
 export type UserRole =
   | "Student"
@@ -165,7 +167,24 @@ const mockUsers: Record<string, User> = {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as User) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (user) window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+      else window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      /* ignore storage errors */
+    }
+  }, [user]);
 
   const login = useCallback((email: string, _password: string) => {
     const lowerEmail = email.toLowerCase().trim();
@@ -214,6 +233,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     setUser(null);
+    try { window.localStorage.removeItem(AUTH_STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   return (
