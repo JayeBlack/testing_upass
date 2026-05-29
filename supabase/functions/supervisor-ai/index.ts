@@ -100,31 +100,47 @@ serve(async (req) => {
 
     const isStreaming = mode === "chat";
 
-    const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${GEMINI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gemini-2.5-flash",
-          messages: allMessages,
-          stream: isStreaming,
-        }),
-      }
-    );
+    // Try primary model, then fall back to lighter models on 503/overload
+    const modelChain = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-1.5-flash"];
+    let response: Response | null = null;
+    let lastErrText = "";
+    let lastStatus = 0;
 
-    if (!response.ok) {
-      const t = await response.text();
-      console.error("Gemini API error:", response.status, t);
-      const msg = response.status === 429
-        ? "Gemini quota reached. Wait a minute or switch to a smaller model."
-        : `Gemini error ${response.status}: ${t.slice(0, 300)}`;
+    for (const model of modelChain) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        response = await fetch(
+          "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${GEMINI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ model, messages: allMessages, stream: isStreaming }),
+          }
+        );
+        if (response.ok) break;
+        lastStatus = response.status;
+        lastErrText = await response.text();
+        console.error(`Gemini ${model} attempt ${attempt + 1} failed: ${response.status}`, lastErrText.slice(0, 200));
+        // Only retry/fallback on transient overload errors
+        if (response.status !== 503 && response.status !== 429 && response.status < 500) break;
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+      if (response && response.ok) break;
+    }
+
+    if (!response || !response.ok) {
+      const friendly =
+        lastStatus === 429
+          ? "AI service is rate-limited right now. Please try again in a moment."
+          : lastStatus === 503
+          ? "AI service is temporarily overloaded. Please retry in a few seconds."
+          : `AI service error (${lastStatus}). Please try again later.`;
+      // Return 200 with structured error so the frontend can show a toast instead of a blank screen
       return new Response(
-        JSON.stringify({ error: msg }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: friendly, fallback: true, status: lastStatus }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
