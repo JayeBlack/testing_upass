@@ -196,7 +196,7 @@ const ReviewSubmissions = () => {
         </div>
 
         {/* Main content grid */}
-        <div className={`grid gap-6 ${showAI ? "lg:grid-cols-[1fr_340px]" : "grid-cols-1"}`}>
+        <div className={`grid gap-6 ${showAI ? "lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]" : "grid-cols-1"}`}>
           <div className="space-y-6 min-w-0">
             {/* Document viewer */}
             <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -227,7 +227,7 @@ const ReviewSubmissions = () => {
                   )}
                 </div>
               </div>
-              <div className="h-[720px] bg-muted/20">
+              <div className="h-[85vh] bg-muted/20">
                 {!fileUrl ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     <Loader2 size={20} className="animate-spin mr-2" /> Loading document...
@@ -240,8 +240,8 @@ const ReviewSubmissions = () => {
                   />
                 ) : fileKind === "docx" ? (
                   docxHtml ? (
-                    <div className="h-full overflow-auto px-4 py-6">
-                      <div className="mx-auto max-w-[8.5in] bg-white text-neutral-900 rounded-md border border-border shadow-md px-[1in] py-[0.85in] docx-page">
+                    <div className="h-full overflow-auto px-6 py-8">
+                      <div className="mx-auto w-full max-w-[100%] xl:max-w-[9.5in] bg-white text-neutral-900 rounded-md border border-border shadow-lg px-8 py-10 xl:px-12 xl:py-12 docx-page">
                         <div
                           className="docx-content"
                           dangerouslySetInnerHTML={{ __html: docxHtml }}
