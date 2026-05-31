@@ -337,6 +337,50 @@ const MINERALS_MSC_MPHIL: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Geological Engineering ──────────────────────────────────────────────
+// Source: UMaT SPS — Faculty of Geoscience and Environmental Studies,
+// Geological Engineering Department postgraduate modular programme
+// (2026 academic year).
+
+const GEOLOGICAL_MSC_MPHIL: ProgrammeCourseCatalog = {
+  key: "geological-msc-mphil",
+  label: "Geological Engineering (MSc / MPhil)",
+  department: "Geological Engineering",
+  levels: ["MSc", "MPhil"],
+  notes: [
+    "GL 261 Introductory Geology is a prerequisite module for candidates without a Geology background.",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // University mandatory
+    { code: "GL 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "GL 556", name: "Labwork/Fieldwork and Report", credits: C, category: "mandatory" },
+    // Compulsory taught modules (*)
+    { code: "GL 553", name: "Operations Research", credits: C, category: "core" },
+    { code: "GL 554", name: "Mine Economic and Financial Evaluation", credits: C, category: "core" },
+    { code: "GL 555", name: "Statistical Models", credits: C, category: "core" },
+    { code: "GL 557", name: "Environmental Management", credits: C, category: "core" },
+    { code: "GL 561", name: "Computer Applications in Geological Engineering", credits: C, category: "core" },
+    { code: "GL 574", name: "Remote Sensing and GIS", credits: C, category: "core" },
+    { code: "GL 579", name: "Applied Artificial Intelligence in Geological Engineering", credits: C, category: "core" },
+    // Prerequisite for non-Geology candidates
+    { code: "GL 261", name: "Introductory Geology", credits: C, category: "elective" },
+    // Elective specialisation modules
+    { code: "GL 552", name: "Mineral Resource Evaluation", credits: C, category: "elective" },
+    { code: "GL 559", name: "Applied Rock Mechanics", credits: C, category: "elective" },
+    { code: "GL 571", name: "Applied Hydrogeology", credits: C, category: "elective" },
+    { code: "GL 572", name: "Mine Water Hydrology", credits: C, category: "elective" },
+    { code: "GL 573", name: "Ore Deposit Geology", credits: C, category: "elective" },
+    { code: "GL 575", name: "Mineral Exploration Geochemistry", credits: C, category: "elective" },
+    { code: "GL 576", name: "Exploration Drilling and Sampling", credits: C, category: "elective" },
+    { code: "GL 577", name: "Water Resources Management", credits: C, category: "elective" },
+    { code: "GL 578", name: "Industrial Minerals", credits: C, category: "elective" },
+    { code: "GL 582", name: "Groundwater Engineering", credits: C, category: "elective" },
+    { code: "GL 584", name: "Mineral Exploration Geophysics", credits: C, category: "elective" },
+    { code: "GL 586", name: "Advanced Ore Microscopy", credits: C, category: "elective" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
@@ -347,6 +391,7 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   MATH_MSC_MPHIL,
   MATH_PHD,
   MINERALS_MSC_MPHIL,
+  GEOLOGICAL_MSC_MPHIL,
 ];
 
 export const getCatalogByKey = (key: string) =>
