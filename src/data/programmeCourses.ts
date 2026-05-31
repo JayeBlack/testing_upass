@@ -754,6 +754,143 @@ const REFINING_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Management Studies — Master of Business and Technology Management ───
+// Source: UMaT SPS — Department of Management Studies postgraduate
+// programmes (July 2025 intake, 2025/2026 academic year). Five tracks share
+// the same Semester I core; Semester II differs per specialisation.
+
+const MBTM_CORE_SEM1 = (prefix: string) => [
+  { code: `${prefix} 551`, name: "Research Methods", credits: C, category: "mandatory" as const },
+  { code: `${prefix} 571`, name: "Management and Organisational Behaviour", credits: C, category: "core" as const },
+  { code: `${prefix} 573`, name: prefix === "EM" ? "Business Economics" : "Managerial Economics", credits: C, category: "core" as const },
+  { code: `${prefix} 575`, name: "Accounting for Business Decisions", credits: C, category: "core" as const },
+  { code: `${prefix} 577`, name: "Quantitative Methods", credits: C, category: "core" as const },
+  { code: `${prefix} 579`, name: "Project and Operations Management", credits: C, category: "core" as const },
+  { code: `${prefix} 581`, name: "Business Intelligence and Data Analytics", credits: C, category: "core" as const },
+  { code: `${prefix} 583`, name: "Management Information Systems", credits: C, category: "core" as const },
+  { code: `${prefix} 589`, name: "Strategic Management", credits: C, category: "core" as const },
+];
+
+const MBTM_SUPPLY_CHAIN_JULY: ProgrammeCourseCatalog = {
+  key: "mbtm-supply-chain-july",
+  label: "Master of Business and Technology Management — Supply Chain Management (July)",
+  department: "Management Studies",
+  levels: ["MBA"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 2 Aug 2025 – 14 Dec 2025; Semester II runs 17 Jan 2026 – 19 Jul 2026.",
+    "Classes are held on weekends (Saturdays and Sundays) from 8:00 am – 5:00 pm.",
+  ],
+  courses: [
+    ...MBTM_CORE_SEM1("MBS"),
+    { code: "MBS 591", name: "Strategic Sourcing", credits: C, category: "elective" },
+    { code: "MBS 587", name: "Technology Entrepreneurship", credits: C, category: "elective" },
+    { code: "MBS 574", name: "Supply Chain Management", credits: C, category: "elective" },
+    { code: "MBS 572", name: "Logistics Engineering and International Trade", credits: C, category: "elective" },
+    { code: "MBS 576", name: "Contract and Procurement", credits: C, category: "elective" },
+    { code: "MBS 582", name: "E-Commerce and Logistics Automation", credits: C, category: "elective" },
+    { code: "MBS 584", name: "Total Quality Management", credits: C, category: "elective" },
+    { code: "MBS 578", name: "Enterprise Resource Management", credits: C, category: "elective" },
+    { code: "MBS 586", name: "Green Supply Chain Management", credits: C, category: "elective" },
+  ],
+};
+
+const MBTM_FINANCE_JULY: ProgrammeCourseCatalog = {
+  key: "mbtm-finance-july",
+  label: "Master of Business and Technology Management — Finance and Investment (July)",
+  department: "Management Studies",
+  levels: ["MBA"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 2 Aug 2025 – 14 Dec 2025; Semester II runs 17 Jan 2026 – 19 Jul 2026.",
+  ],
+  courses: [
+    ...MBTM_CORE_SEM1("MBF"),
+    { code: "MBF 591", name: "Strategic Sourcing", credits: C, category: "elective" },
+    { code: "MBF 587", name: "Technology Entrepreneurship", credits: C, category: "elective" },
+    { code: "MBF 572", name: "International Finance", credits: C, category: "elective" },
+    { code: "MBF 578", name: "Derivatives and Investment Management", credits: C, category: "elective" },
+    { code: "MBF 574", name: "Monetary Economics", credits: C, category: "elective" },
+    { code: "MBF 576", name: "Corporate Finance", credits: C, category: "elective" },
+    { code: "MBF 580", name: "Quantitative Finance", credits: C, category: "elective" },
+    { code: "MBF 582", name: "Financial Markets and Institutions", credits: C, category: "elective" },
+    { code: "MBF 584", name: "Financial Risk Management", credits: C, category: "elective" },
+  ],
+};
+
+const MBTM_MIS_JULY: ProgrammeCourseCatalog = {
+  key: "mbtm-mis-july",
+  label: "Master of Business and Technology Management — Management Information Systems (July)",
+  department: "Management Studies",
+  levels: ["MBA"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 2 Aug 2025 – 14 Dec 2025; Semester II runs 17 Jan 2026 – 19 Jul 2026.",
+  ],
+  courses: [
+    ...MBTM_CORE_SEM1("MBM"),
+    { code: "MBM 591", name: "Strategic Sourcing", credits: C, category: "elective" },
+    { code: "MBM 587", name: "Technology Entrepreneurship", credits: C, category: "elective" },
+    { code: "MBM 572", name: "Object Oriented Programming Using Java", credits: C, category: "elective" },
+    { code: "MBM 574", name: "Emerging Technologies", credits: C, category: "elective" },
+    { code: "MBM 576", name: "Cyber Security", credits: C, category: "elective" },
+    { code: "MBM 578", name: "Enterprise Resource Management", credits: C, category: "elective" },
+    { code: "MBM 580", name: "Database Management Systems", credits: C, category: "elective" },
+  ],
+};
+
+const MBTM_HR_JULY: ProgrammeCourseCatalog = {
+  key: "mbtm-hr-july",
+  label: "Master of Business and Technology Management — Strategic Human Resource Management (July)",
+  department: "Management Studies",
+  levels: ["MBA"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 2 Aug 2025 – 14 Dec 2025; Semester II runs 17 Jan 2026 – 19 Jul 2026.",
+  ],
+  courses: [
+    ...MBTM_CORE_SEM1("MBH"),
+    { code: "MBH 591", name: "Strategic Sourcing", credits: C, category: "elective" },
+    { code: "MBH 587", name: "Technology Entrepreneurship", credits: C, category: "elective" },
+    { code: "MBH 572", name: "Human Resource Management", credits: C, category: "elective" },
+    { code: "MBH 574", name: "Workplace Health and Safety Management", credits: C, category: "elective" },
+    { code: "MBH 576", name: "Human Performance and Reward Management", credits: C, category: "elective" },
+    { code: "MBH 582", name: "Industrial Culture and Behaviour", credits: C, category: "elective" },
+    { code: "MBH 584", name: "Cross-Cultural Management", credits: C, category: "elective" },
+    { code: "MBH 588", name: "Human Capital Development", credits: C, category: "elective" },
+  ],
+};
+
+const MSC_ENG_MGMT_JULY: ProgrammeCourseCatalog = {
+  key: "msc-engineering-management-july",
+  label: "MSc Engineering Management (July)",
+  department: "Management Studies",
+  levels: ["MSc"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 2 Aug 2025 – 14 Dec 2025; Semester II runs 17 Jan 2026 – 19 Jul 2026.",
+  ],
+  courses: [
+    { code: "EM 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "EM 571", name: "Management and Organisational Behaviour", credits: C, category: "core" },
+    { code: "EM 573", name: "Business Economics", credits: C, category: "core" },
+    { code: "EM 575", name: "Accounting for Business Decisions", credits: C, category: "core" },
+    { code: "EM 577", name: "Management Information Systems", credits: C, category: "core" },
+    { code: "EM 579", name: "Project and Operations Management", credits: C, category: "core" },
+    { code: "EM 581", name: "Procurement Management", credits: C, category: "core" },
+    { code: "EM 583", name: "Supply Chain Management", credits: C, category: "core" },
+    { code: "EM 585", name: "Business Intelligence and Data Analytics", credits: C, category: "core" },
+    { code: "EM 591", name: "Strategic Management", credits: C, category: "core" },
+    { code: "EM 572", name: "Corporate Finance", credits: C, category: "elective" },
+    { code: "EM 574", name: "Energy and Environmental Policy Analysis", credits: C, category: "elective" },
+    { code: "EM 576", name: "Sustainable Engineering", credits: C, category: "elective" },
+    { code: "EM 578", name: "Management of Technology and Innovation", credits: C, category: "elective" },
+    { code: "EM 580", name: "Engineering Economics", credits: C, category: "elective" },
+    { code: "EM 582", name: "Resource Management", credits: C, category: "elective" },
+    { code: "EM 587", name: "Technology Entrepreneurship", credits: C, category: "elective" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
@@ -774,6 +911,11 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   PETROLEUM_PHD,
   REFINING_MSC_MPHIL_JULY,
   CSE_MSC_MPHIL,
+  MBTM_SUPPLY_CHAIN_JULY,
+  MBTM_FINANCE_JULY,
+  MBTM_MIS_JULY,
+  MBTM_HR_JULY,
+  MSC_ENG_MGMT_JULY,
 ];
 
 export const getCatalogByKey = (key: string) =>
