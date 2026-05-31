@@ -166,11 +166,81 @@ const EEE_PHD: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Mechanical Engineering ──────────────────────────────────────────────
+// Source: UMaT SPS — Faculty of Engineering, Mechanical Engineering
+// Department postgraduate modular programme (2025/2026 academic year).
+
+const MECH_MSC_MPHIL: ProgrammeCourseCatalog = {
+  key: "mech-msc-mphil",
+  label: "Mechanical Engineering (MSc / MPhil)",
+  department: "Mechanical Engineering",
+  levels: ["MSc", "MPhil"],
+  notes: [
+    "MC 401, MC 403, MC 405 and MC 407 are audit courses for students without a Mechanical Engineering background (offered on demand).",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // University mandatory
+    { code: "MC 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "MC 556", name: "Field/Laboratory Work", credits: C, category: "mandatory" },
+    // Taught modules (selected with supervisor)
+    { code: "MC 533", name: "Operations Research", credits: C, category: "elective" },
+    { code: "MC 562", name: "Engineering Economics", credits: C, category: "elective" },
+    { code: "MC 570", name: "Advanced Manufacturing Processes", credits: C, category: "elective" },
+    { code: "MC 571", name: "Engineering Heat Transfer", credits: C, category: "elective" },
+    { code: "MC 572", name: "Gas Turbines and Fuel Cells", credits: C, category: "elective" },
+    { code: "MC 573", name: "Advanced Fluid Mechanics", credits: C, category: "elective" },
+    { code: "MC 574", name: "Gas Dynamics", credits: C, category: "elective" },
+    { code: "MC 575", name: "Computational Fluid Dynamics", credits: C, category: "elective" },
+    { code: "MC 576", name: "Advanced Engineering Thermodynamics", credits: C, category: "elective" },
+    { code: "MC 577", name: "Combustion and Internal Combustion Engines", credits: C, category: "elective" },
+    { code: "MC 578", name: "Renewable Energy Resources", credits: C, category: "elective" },
+    { code: "MC 580", name: "Composite Mechanics", credits: C, category: "elective" },
+    { code: "MC 581", name: "Structural Optimisation", credits: C, category: "elective" },
+    { code: "MC 582", name: "Fatigue and Fractures", credits: C, category: "elective" },
+    { code: "MC 583", name: "Advanced Stress Analysis", credits: C, category: "elective" },
+    { code: "MC 586", name: "Product System Automation", credits: C, category: "elective" },
+    { code: "MC 588", name: "Advanced CAD/CAM", credits: C, category: "elective" },
+    { code: "MC 589", name: "Product Modelling and Optimisation", credits: C, category: "elective" },
+    { code: "MC 590", name: "Design and Development of Manufacturing Operations", credits: C, category: "elective" },
+    { code: "MC 591", name: "Advanced Vibrations", credits: C, category: "elective" },
+    { code: "MC 592", name: "Multi Body Dynamics and Robotics", credits: C, category: "elective" },
+    { code: "MC 593", name: "Reverse Engineering and Rapid Prototyping", credits: C, category: "elective" },
+    { code: "MC 594", name: "Material Selection in Mechanical Design", credits: C, category: "elective" },
+    { code: "MC 595", name: "Industrial Production Management", credits: C, category: "elective" },
+    { code: "MC 597", name: "Advanced Material Technology", credits: C, category: "elective" },
+  ],
+};
+
+const MECH_PHD: ProgrammeCourseCatalog = {
+  key: "mech-phd",
+  label: "Mechanical Engineering (PhD)",
+  department: "Mechanical Engineering",
+  levels: ["PhD"],
+  notes: [
+    "MC 551 Research Methods and MC 655 Individual Studies are compulsory for all PhD candidates.",
+    "MC 656 University Teaching Experience is compulsory only for Postgraduate Assistants.",
+    "MC 401, MC 403, MC 405 and MC 407 are audit prerequisites for candidates without a Mechanical Engineering background (offered on demand).",
+  ],
+  courses: [
+    { code: "MC 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "MC 655", name: "Individual Studies", credits: C, category: "mandatory" },
+    { code: "MC 656", name: "University Teaching Experience", credits: C, category: "mandatory" },
+    // Audit / preparatory
+    { code: "MC 401", name: "Introduction to Mechanical Engineering", credits: C, category: "core" },
+    { code: "MC 403", name: "Numerical Methods", credits: C, category: "core" },
+    { code: "MC 405", name: "Control Systems", credits: C, category: "core" },
+    { code: "MC 407", name: "Computer Applications: Programming in C/C++", credits: C, category: "core" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
   EEE_MSC_MPHIL,
   EEE_PHD,
+  MECH_MSC_MPHIL,
+  MECH_PHD,
 ];
 
 export const getCatalogByKey = (key: string) =>
