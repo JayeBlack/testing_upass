@@ -1,0 +1,15 @@
+# UMaT Postgraduate Administrative Support System
+
+> Official portal of the School of Postgraduate Studies (SPS), University of Mines and Technology (UMaT), Tarkwa, Ghana. Provides postgraduate students, supervisors and SPS staff with course registration, thesis submission and tracking, fee payments, results, clearance and document requests.
+
+The portal is an authenticated system; most functional pages require a sign-in and are not crawlable.
+
+## Pages
+
+- [Sign in](/): Sign-in page for students, supervisors, deans, accountants, exams officers and administrators.
+
+## About UMaT SPS
+
+- Institution: University of Mines and Technology, Tarkwa, Ghana
+- School: School of Postgraduate Studies (SPS)
+- Website: https://sps.umat.edu.gh/
