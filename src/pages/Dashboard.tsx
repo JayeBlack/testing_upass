@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStoreContext";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
 import DashboardLayout from "@/components/DashboardLayout";
+import SEO from "@/components/SEO";
 import {
   BookOpen, FileText, Users, BarChart3, Clock, CheckCircle,
   ArrowUpRight, TrendingUp, TrendingDown, Activity, Banknote,
@@ -226,6 +227,10 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
+      <SEO
+        title="Dashboard — UMaT Postgraduate Portal"
+        description="Your personalised UMaT postgraduate dashboard: courses, thesis progress, fees and clearance at a glance."
+      />
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">
