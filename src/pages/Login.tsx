@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock } from "lucide-react";
 import umatLogo from "@/assets/umat-logo.png";
+import SEO from "@/components/SEO";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -18,6 +19,10 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex">
+      <SEO
+        title="Sign in — UMaT Postgraduate Portal"
+        description="Sign in to the UMaT School of Postgraduate Studies portal for students, supervisors and staff."
+      />
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 gradient-navy items-center justify-center p-12 relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
