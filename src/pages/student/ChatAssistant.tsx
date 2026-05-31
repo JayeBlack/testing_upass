@@ -211,9 +211,9 @@ const ChatAssistant = () => {
           <div className="bg-card rounded-xl border border-border p-6">
             <div className="text-center mb-5">
               <Sparkles size={32} className="mx-auto text-primary/60 mb-2" />
-              <h3 className="font-display font-bold text-foreground">
+              <h2 className="font-display font-bold text-foreground">
                 Welcome to SPS Assistant
-              </h3>
+              </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 I can help you with fees, course registration, thesis submissions,
                 clearance, and other academic matters.
@@ -297,6 +297,7 @@ const ChatAssistant = () => {
               onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
               className="shrink-0"
+              aria-label="Send message"
             >
               {isLoading ? (
                 <Loader2 size={16} className="animate-spin" />

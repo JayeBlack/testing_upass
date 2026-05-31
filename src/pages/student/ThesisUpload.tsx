@@ -138,16 +138,18 @@ const ThesisUpload = () => {
             onChange={handleFilePick}
             className="hidden"
           />
-          <div
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary transition-colors"
+          <button
+            type="button"
+            className="w-full border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary transition-colors"
             onClick={() => fileInputRef.current?.click()}
+            aria-label="Upload thesis file"
           >
             <Upload size={32} className="mx-auto text-muted-foreground mb-3" />
             <p className="text-sm text-foreground font-medium">
               {selectedFile?.name || "Click to upload"}
             </p>
             <p className="text-xs text-muted-foreground mt-1">PDF, DOC, DOCX up to 50MB</p>
-          </div>
+          </button>
           {selectedFile && (
             <button
               onClick={handleSubmit}
