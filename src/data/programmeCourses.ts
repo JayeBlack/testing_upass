@@ -713,6 +713,47 @@ const GEOLOGICAL_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Petroleum Refining and Petrochemical Engineering (July intake) ─────
+// Source: UMaT SPS — Petroleum Refining and Petrochemical Engineering
+// Department postgraduate modular programme (July 2025 intake).
+
+const REFINING_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
+  key: "refining-msc-mphil-july",
+  label: "Petroleum Refining and Petrochemical Engineering (MSc / MPhil) — July",
+  department: "Petroleum Refining and Petrochemical Engineering",
+  levels: ["MSc", "MPhil", "PhD"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake schedule. Modules run from 14th July 2025 to 12th December 2025.",
+    "RP 511 is a prerequisite/introductory module for non-Petroleum Refining and Petrochemical Engineering applicants.",
+    "RP 513 is a prerequisite/introductory module for Physical Sciences applicants.",
+    "RP 665 Individual Study is compulsory for all PhD candidates.",
+    "RP 656 University Teaching Experience is compulsory only for Postgraduate Assistants.",
+    "Participation fee: GH¢1,000.00 per module for registered students / GH¢1,400.00 per other participants / $500.00 per foreign participant.",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // Mandatory / research
+    { code: "RP 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "RP 550", name: "Graduate Seminar", credits: C, category: "mandatory" },
+    { code: "RP 551", name: "Research Methods", credits: C, category: "mandatory" },
+    // Prerequisite / Introductory
+    { code: "RP 511", name: "Introduction to Petroleum Refining and Petrochemical Engineering", credits: C, category: "core" },
+    { code: "RP 513", name: "Introduction to Transport Phenomena", credits: C, category: "core" },
+    // Core taught modules
+    { code: "RP 570", name: "Advanced Chemical Reaction Engineering", credits: C, category: "core" },
+    { code: "RP 571", name: "Applied Computational Methods", credits: C, category: "core" },
+    { code: "RP 576", name: "Plant Design and Economics", credits: C, category: "core" },
+    { code: "RP 577", name: "Corrosion Engineering", credits: C, category: "core" },
+    { code: "RP 582", name: "Nanotechnology in Refining and Petrochemical Industries", credits: C, category: "core" },
+    { code: "RP 584", name: "Application of Artificial Intelligence in Petroleum Refining", credits: C, category: "core" },
+    { code: "RP 592", name: "Design of Experiment", credits: C, category: "core" },
+    // PhD / Postgraduate Assistant requirements
+    { code: "RP 665", name: "Individual Study", credits: C, category: "mandatory" },
+    { code: "RP 656", name: "University Teaching Experience", credits: C, category: "mandatory" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
@@ -731,6 +772,7 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOLOGICAL_MSC_MPHIL_JULY,
   PETROLEUM_MSC_MPHIL,
   PETROLEUM_PHD,
+  REFINING_MSC_MPHIL_JULY,
   CSE_MSC_MPHIL,
 ];
 
