@@ -411,6 +411,39 @@ const MATH_PHD: ProgrammeCourseCatalog = {
 };
 
 // ─── Minerals Engineering ────────────────────────────────────────────────
+// ─── Mathematical Sciences (July intake) ─────────────────────────────────
+// Source: UMaT SPS — Faculty of Computing and Mathematical Sciences,
+// Mathematics Department postgraduate modular programme (July 2025 intake).
+
+const MATH_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
+  key: "math-msc-mphil-july",
+  label: "Mathematical Sciences (MSc / MPhil) — July",
+  department: "Mathematical Sciences",
+  levels: ["MSc", "MPhil"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake schedule. Modules run from 14th July 2025 to 12th December 2025.",
+    "Participation fee: GH¢1,000.00 per module for registered students / GH¢1,400.00 per other participants / $500.00 per foreign participant.",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // Compulsory modules
+    { code: "MA 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "MA 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "MA 553", name: "Operations Research", credits: C, category: "core" },
+    { code: "MA 573", name: "Time Series and Forecasting", credits: C, category: "core" },
+    { code: "MA 275", name: "Numerical Methods", credits: C, category: "core" },
+    { code: "MA 579", name: "Computer Programming", credits: C, category: "core" },
+    // Elective modules
+    { code: "MA 572", name: "Multivariate Analysis", credits: C, category: "elective" },
+    { code: "MA 574", name: "Design and Analysis of Experiments", credits: C, category: "elective" },
+    { code: "MA 581", name: "Computational Finance", credits: C, category: "elective" },
+    { code: "MA 583", name: "Investment Analysis and Portfolio Theory", credits: C, category: "elective" },
+    { code: "MA 591", name: "Application of Numerical Analysis to ODEs", credits: C, category: "elective" },
+    { code: "MA 593", name: "Application of Numerical Analysis to PDEs", credits: C, category: "elective" },
+  ],
+};
+
 // Source: UMaT SPS — Faculty of Mineral Resources Technology, Minerals
 // Engineering Department postgraduate modular programme (January admission,
 // 2025/2026 academic year).
@@ -622,6 +655,7 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   MECH_PHD,
   MATH_MSC_MPHIL,
   MATH_PHD,
+  MATH_MSC_MPHIL_JULY,
   MINERALS_MSC_MPHIL,
   GEOLOGICAL_MSC_MPHIL,
   PETROLEUM_MSC_MPHIL,
