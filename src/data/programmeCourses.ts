@@ -644,6 +644,41 @@ const CSE_MSC_MPHIL: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Mining Engineering (July intake) ────────────────────────────────────
+// Source: UMaT SPS — Faculty of Mineral Resources Technology, Mining
+// Engineering Department postgraduate modular programme (July 2025 intake).
+
+const MINING_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
+  key: "mining-msc-mphil-july",
+  label: "Mining Engineering (MSc / MPhil) — July",
+  department: "Mining Engineering",
+  levels: ["MSc", "MPhil", "PhD"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake schedule. Modules run from 14th July 2025 to 12th December 2025.",
+    "MN 655 Individual Studies is compulsory for all PhD candidates.",
+    "MN 656 University Teaching Experience is compulsory only for Postgraduate Assistants.",
+    "Participation fee: GH¢1,000.00 per module for registered students / GH¢1,400.00 per other participants / $500.00 per foreign participant.",
+    "Registration closes one (1) week before the commencement of each module. Contact: The Secretary, Mining Engineering Department, UMaT (+233 312291786).",
+  ],
+  courses: [
+    // Compulsory taught + research modules
+    { code: "MN 261", name: "Introduction to Mining Engineering", credits: C, category: "core" },
+    { code: "MN 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "MN 553", name: "Operations Research", credits: C, category: "core" },
+    { code: "MN 554", name: "Mine Economic and Financial Evaluation", credits: C, category: "core" },
+    { code: "MN 555", name: "Statistical Models", credits: C, category: "core" },
+    { code: "MN 556", name: "Labwork/Fieldwork and Report", credits: C, category: "mandatory" },
+    { code: "MN 557", name: "Environmental Management", credits: C, category: "core" },
+    { code: "MN 559", name: "Applied Rock Mechanics", credits: C, category: "core" },
+    { code: "MN 563", name: "Data Mining and Advanced Analysis", credits: C, category: "core" },
+    { code: "GL/MN 552", name: "Mineral Resource Evaluation (Geology)", credits: C, category: "elective" },
+    // PhD / Postgraduate Assistant requirements
+    { code: "MN 655", name: "Individual Studies", credits: C, category: "mandatory" },
+    { code: "MN 656", name: "University Teaching Experience", credits: C, category: "mandatory" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
@@ -657,6 +692,7 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   MATH_PHD,
   MATH_MSC_MPHIL_JULY,
   MINERALS_MSC_MPHIL,
+  MINING_MSC_MPHIL_JULY,
   GEOLOGICAL_MSC_MPHIL,
   PETROLEUM_MSC_MPHIL,
   PETROLEUM_PHD,
