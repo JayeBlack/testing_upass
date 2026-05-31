@@ -220,7 +220,9 @@ const Dashboard = () => {
     ? ["Fee Analytics", "Student Fees", "Export Reports", "Fee Notices"]
     : user?.role === "ExamsOfficer"
     ? ["Enter Grades", "Pass List", "Publish Results", "View Analytics"]
-    : ["Enroll Students", "Update Fees", "Generate List", "System Log"];
+    : isSuperAdmin
+    ? ["Enroll Students", "Update Fees", "Generate List", "System Log"]
+    : ["Enroll Students", "Update Fees", "Generate List"];
 
   return (
     <DashboardLayout>
