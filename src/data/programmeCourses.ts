@@ -891,6 +891,74 @@ const MSC_ENG_MGMT_JULY: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Environmental & Safety Engineering — MSc/MPhil/PhD Occupational Health and Safety ───
+// Source: UMaT SPS — 2025 Academic Year timetable (July intake).
+const OHS_MSC_MPHIL_PHD_JULY: ProgrammeCourseCatalog = {
+  key: "ohs-msc-mphil-phd-july",
+  label: "Occupational Health and Safety (MSc / MPhil / PhD) — July",
+  department: "Environmental and Safety Engineering",
+  levels: ["MSc", "MPhil", "PhD"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025 intake. Semester I runs 26 Jul 2025 – 7 Dec 2025; Semester II runs 24 Jan 2026 – 17 May 2026.",
+    "Classes hold on weekends (Saturdays and Sundays), 8:00 am – 5:00 pm with a 12:00 – 1:00 pm break.",
+    "HS 501 is a prerequisite module for applicants without an Occupational Health & Safety background.",
+    "HS 551 Research Methods is compulsory for MSc, MPhil and PhD students in addition to all other compulsory modules.",
+    "All first semester courses are compulsory for both MSc and MPhil students; MPhil students must take a minimum of 6 compulsory modules.",
+    "HS 559 Field/Lab Work and HS 550 MSc/MPhil Seminar are mandatory for all MSc and MPhil students (registered in either semester).",
+    "MSc students select a minimum of four (4) Semester II electives from one specialisation: Human Factors and Ergonomics, Occupational Hygiene, Occupational Safety Risk Management, or Fire, Explosion and Process Safety.",
+    "Participation fee: GH¢1,000.00 per module for registered students / GH¢1,400.00 per other participants / $500.00 per foreign participant.",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // Semester I — Compulsory
+    { code: "HS 501", name: "Introduction to Occupational Health & Safety Management (prerequisite)", credits: C, category: "core" },
+    { code: "HS 573", name: "Occupational Health & Safety Management Systems", credits: C, category: "core" },
+    { code: "HS 571", name: "Occupational Health & Safety Law and Policy", credits: C, category: "core" },
+    { code: "HS 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "HS 579", name: "Artificial Intelligence in OHS", credits: C, category: "core" },
+    { code: "HS 577", name: "Statistical Data Analysis", credits: C, category: "core" },
+    { code: "HS 575", name: "Project Management", credits: C, category: "core" },
+    { code: "HS 561", name: "Critical Thinking and Decision Making", credits: C, category: "core" },
+    // Mandatory research components
+    { code: "HS 559", name: "Field/Lab Work", credits: C, category: "mandatory" },
+    { code: "HS 550", name: "MSc/MPhil Seminar", credits: C, category: "mandatory" },
+    // Semester II — Human Factors and Ergonomics electives
+    { code: "HSE 574", name: "Human Error and Behaviour", credits: C, category: "elective" },
+    { code: "HSE 576", name: "Human-Computer System", credits: C, category: "elective" },
+    { code: "HSE 578", name: "Cognitive Ergonomics", credits: C, category: "elective" },
+    { code: "HSE 592", name: "Human Factor and Ergonomic Analysis", credits: C, category: "elective" },
+    { code: "HSE 584", name: "Occupational and Environmental Ergonomics", credits: C, category: "elective" },
+    { code: "HSE 586", name: "Simulation, Virtual Reality and Advanced Human-Machine Interface", credits: C, category: "elective" },
+    { code: "HSE 588", name: "Work Systems and Safety", credits: C, category: "elective" },
+    { code: "HSE 582", name: "Physical Ergonomics", credits: C, category: "elective" },
+    // Semester II — Occupational Hygiene electives
+    { code: "HSH 574", name: "Understanding Physical Agents", credits: C, category: "elective" },
+    { code: "HSH 576", name: "Hazardous Substances", credits: C, category: "elective" },
+    { code: "HSH 578", name: "Introduction to Public Health", credits: C, category: "elective" },
+    { code: "HSH 582", name: "Principles of Industrial Hygiene", credits: C, category: "elective" },
+    { code: "HSH 584", name: "Occupational Epidemiology and Psychology", credits: C, category: "elective" },
+    { code: "HSH 586", name: "Control of Workplace Hazards", credits: C, category: "elective" },
+    { code: "HSH 588", name: "Occupational Toxicology", credits: C, category: "elective" },
+    // Semester II — Occupational Safety Risk Management electives
+    { code: "HSS 576", name: "Human Factors and Ergonomics", credits: C, category: "elective" },
+    { code: "HSS 578", name: "Occupational Health and Safety Principles in Practice", credits: C, category: "elective" },
+    { code: "HSS 582", name: "Accident Investigation and Analysis", credits: C, category: "elective" },
+    { code: "HSS 584", name: "Risk Management", credits: C, category: "elective" },
+    { code: "HSS 586", name: "Safety Culture Development and Assessment", credits: C, category: "elective" },
+    { code: "HSS 588", name: "Systems Safety", credits: C, category: "elective" },
+    // Semester II — Fire, Explosion and Process Safety electives
+    { code: "HSP 574", name: "Fire Dynamics and Modelling", credits: C, category: "elective" },
+    { code: "HSP 594", name: "Explosive Risk Management", credits: C, category: "elective" },
+    { code: "HSP 578", name: "Fire Risk Analysis", credits: C, category: "elective" },
+    { code: "HSP 582", name: "Fire Scene Investigation and Failure Analysis", credits: C, category: "elective" },
+    { code: "HSP 584", name: "Fire Protection Systems Application", credits: C, category: "elective" },
+    { code: "HSP 586", name: "Principles of Process Safety", credits: C, category: "elective" },
+    { code: "HSP 588", name: "Safety Instrumented Systems", credits: C, category: "elective" },
+    { code: "HSP 592", name: "Control and Process Monitoring", credits: C, category: "elective" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
