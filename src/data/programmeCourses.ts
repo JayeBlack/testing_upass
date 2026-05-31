@@ -381,6 +381,68 @@ const GEOLOGICAL_MSC_MPHIL: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Petroleum Engineering ───────────────────────────────────────────────
+// Source: UMaT SPS — Petroleum Engineering Department postgraduate
+// modular programme (January 2026 academic year).
+
+const PETROLEUM_MSC_MPHIL: ProgrammeCourseCatalog = {
+  key: "petroleum-msc-mphil",
+  label: "Petroleum Engineering (MSc / MPhil)",
+  department: "Petroleum Engineering",
+  levels: ["MSc", "MPhil"],
+  notes: [
+    "PE 511 Introduction to Petroleum Engineering and PE 513 Introduction to Engineering Mechanics are prerequisite modules for candidates without a Petroleum Engineering background.",
+    "Participation fee: GH¢1,000.00 per module (registered students), GH¢1,400.00 per module (other participants), US$500.00 per module (foreign participants).",
+    "Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // Mandatory
+    { code: "PE 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "PE 550", name: "Graduate Seminar", credits: C, category: "mandatory" },
+    { code: "PE 556", name: "Labwork/Fieldwork and Report", credits: C, category: "mandatory" },
+    // Prerequisites
+    { code: "PE 511", name: "Introduction to Petroleum Engineering", credits: C, category: "elective" },
+    { code: "PE 513", name: "Introduction to Engineering Mechanics", credits: C, category: "elective" },
+    // Taught specialisation modules
+    { code: "PE 574", name: "Health, Safety and Environment in Petroleum Industry", credits: C, category: "elective" },
+    { code: "PE 576", name: "Petroleum Economics and Management", credits: C, category: "elective" },
+    { code: "PE 578", name: "Offshore Drilling Technology", credits: C, category: "elective" },
+    { code: "PE 582", name: "Advanced Reservoir Modelling and Simulation", credits: C, category: "elective" },
+    { code: "PE 584", name: "Improved Recovery Methods", credits: C, category: "elective" },
+    { code: "PE 586", name: "Well Test Analysis", credits: C, category: "elective" },
+    { code: "PE 588", name: "Multi-phase Flow in Pipes", credits: C, category: "elective" },
+    { code: "PE 592", name: "Advanced Well Logging", credits: C, category: "elective" },
+    { code: "PE 594", name: "Petroleum Refinery Operations", credits: C, category: "elective" },
+  ],
+};
+
+const PETROLEUM_PHD: ProgrammeCourseCatalog = {
+  key: "petroleum-phd",
+  label: "Petroleum Engineering (PhD)",
+  department: "Petroleum Engineering",
+  levels: ["PhD"],
+  notes: [
+    "PE 500 Thesis, PE 550 Graduate Seminar and PE 665 Individual Study are compulsory for all PhD candidates.",
+    "PE 656 University Teaching Experience is compulsory only for Postgraduate Assistants.",
+  ],
+  courses: [
+    { code: "PE 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "PE 550", name: "Graduate Seminar", credits: C, category: "mandatory" },
+    { code: "PE 665", name: "Individual Study", credits: C, category: "mandatory" },
+    { code: "PE 656", name: "University Teaching Experience", credits: C, category: "mandatory" },
+    // Specialisation electives (selected with supervisor)
+    { code: "PE 574", name: "Health, Safety and Environment in Petroleum Industry", credits: C, category: "elective" },
+    { code: "PE 576", name: "Petroleum Economics and Management", credits: C, category: "elective" },
+    { code: "PE 578", name: "Offshore Drilling Technology", credits: C, category: "elective" },
+    { code: "PE 582", name: "Advanced Reservoir Modelling and Simulation", credits: C, category: "elective" },
+    { code: "PE 584", name: "Improved Recovery Methods", credits: C, category: "elective" },
+    { code: "PE 586", name: "Well Test Analysis", credits: C, category: "elective" },
+    { code: "PE 588", name: "Multi-phase Flow in Pipes", credits: C, category: "elective" },
+    { code: "PE 592", name: "Advanced Well Logging", credits: C, category: "elective" },
+    { code: "PE 594", name: "Petroleum Refinery Operations", credits: C, category: "elective" },
+  ],
+};
+
 export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_MSC_MPHIL,
   GEOMATIC_PHD,
@@ -392,6 +454,8 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   MATH_PHD,
   MINERALS_MSC_MPHIL,
   GEOLOGICAL_MSC_MPHIL,
+  PETROLEUM_MSC_MPHIL,
+  PETROLEUM_PHD,
 ];
 
 export const getCatalogByKey = (key: string) =>
