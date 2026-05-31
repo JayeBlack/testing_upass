@@ -916,6 +916,7 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   MBTM_MIS_JULY,
   MBTM_HR_JULY,
   MSC_ENG_MGMT_JULY,
+  OHS_MSC_MPHIL_PHD_JULY,
 ];
 
 export const getCatalogByKey = (key: string) =>
