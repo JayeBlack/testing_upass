@@ -198,7 +198,7 @@ const CourseRegistration = () => {
             {(["All", "January", "July"] as const).map((c) => (
               <button
                 key={c}
-                onClick={() => setCycleFilter(c)}
+                onClick={() => handleCycleChange(c)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                   cycleFilter === c
                     ? "gradient-gold text-secondary-foreground border-transparent"
@@ -219,7 +219,7 @@ const CourseRegistration = () => {
             </label>
             <select
               id="department-select"
-              value={department}
+              value={effectiveDepartment}
               onChange={(e) => {
                 setDepartment(e.target.value);
                 const firstInDept = PROGRAMME_COURSE_CATALOGS.find(
