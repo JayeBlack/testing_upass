@@ -174,6 +174,99 @@ const EEE_PHD: ProgrammeCourseCatalog = {
   ],
 };
 
+// ─── Electrical and Electronic Engineering (July intake) ─────────────────
+// Source: UMaT SPS — Faculty of Engineering, Electrical and Electronic
+// Engineering Department postgraduate modular programme, 2025/2026 academic
+// year July admission cycle (modules run July 2025 – June 2026).
+
+const EEE_MSC_MPHIL_JULY: ProgrammeCourseCatalog = {
+  key: "eee-msc-mphil-july",
+  label: "Electrical and Electronic Engineering (MSc / MPhil) — July",
+  department: "Electrical and Electronic Engineering",
+  levels: ["MSc", "MPhil"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025/2026 intake schedule. Modules run from 7th July 2025 to 19th June 2026.",
+    "MSc requires a minimum of 57 credit hours: 7 compulsory core modules (≥21 credits), at least 3 electives, Postgraduate Seminar (3), Field/Laboratory Work (3) and Thesis (21).",
+    "MPhil requires a minimum of 60 credit hours: 7 compulsory core modules (≥21 credits), at least 1 elective, Postgraduate Seminar (3), Field/Laboratory Work (3) and Thesis (30).",
+    "Module fee: GH¢1,000.00 per registered student / GH¢1,400.00 per non-registered participant / $500.00 per foreign participant. Registration closes one (1) week before the commencement of each module.",
+  ],
+  courses: [
+    // University mandatory
+    { code: "EL 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "EL 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "EL 556", name: "Field/Laboratory Work", credits: C, category: "mandatory" },
+    // Preparatory / Introductory (audit for students without EEE background)
+    { code: "EL 401", name: "MATLAB/Simulink for Engineers", credits: C, category: "core" },
+    { code: "EL 403", name: "Introduction to Computer Applications", credits: C, category: "core" },
+    { code: "EL 405", name: "Numerical Methods", credits: C, category: "core" },
+    { code: "EL 407", name: "Probability and Statistics for Engineers", credits: C, category: "core" },
+    // Core (compulsory taught) modules
+    { code: "EL 560", name: "Engineering Economics", credits: C, category: "core" },
+    { code: "EL 571", name: "Modelling and Simulation", credits: C, category: "core" },
+    { code: "EL 572", name: "Advanced Signal Processing", credits: C, category: "core" },
+    { code: "EL 573", name: "Artificial Intelligence in Manufacturing", credits: C, category: "core" },
+    { code: "EL 574", name: "Microprocessor Systems", credits: C, category: "core" },
+    { code: "EL 575", name: "Power System Planning, Protection and Operations", credits: C, category: "core" },
+    { code: "EL 579", name: "Computer Control Systems", credits: C, category: "core" },
+    // Electives / specialisation modules
+    { code: "EL 553", name: "Operations Research", credits: C, category: "elective" },
+    { code: "EL 576", name: "Power System Modelling, Stability and Control", credits: C, category: "elective" },
+    { code: "EL 577", name: "Microwave Engineering and Optical Communication Systems", credits: C, category: "elective" },
+    { code: "EL 578", name: "Broadcasting Technologies", credits: C, category: "elective" },
+    { code: "EL 580", name: "Wireless Technologies", credits: C, category: "elective" },
+    { code: "EL 581", name: "Advanced Robotics", credits: C, category: "elective" },
+    { code: "EL 582", name: "Electrical Machines and Power Electronics Drives", credits: C, category: "elective" },
+    { code: "EL 583", name: "Industrial Automation", credits: C, category: "elective" },
+    { code: "EL 584", name: "Optimal Control Systems", credits: C, category: "elective" },
+    { code: "EL 586", name: "Mobile Communication Systems", credits: C, category: "elective" },
+    { code: "EL 588", name: "Environmental and Safety Engineering", credits: C, category: "elective" },
+    { code: "EL 590", name: "Power Systems Optimisation and Economics", credits: C, category: "elective" },
+    { code: "EL 592", name: "Green Energy and Smart Grid Systems", credits: C, category: "elective" },
+  ],
+};
+
+const EEE_PHD_JULY: ProgrammeCourseCatalog = {
+  key: "eee-phd-july",
+  label: "Electrical and Electronic Engineering (PhD) — July",
+  department: "Electrical and Electronic Engineering",
+  levels: ["PhD"],
+  admissionCycle: "July",
+  notes: [
+    "July 2025/2026 intake schedule. Modules run from 7th July 2025 to 19th June 2026.",
+    "Minimum 57 credit hours: Thesis (45), two Seminars (6), Research Methods (3) and Individual Studies (3).",
+    "Preparatory modules (EL 401, EL 403, EL 405, EL 407) are mandatory for all PhD students without an EEE background.",
+    "EL 656 University Teaching Experience is mandatory only for UMaT PhD students on staff development.",
+    "Successful thesis defence and publication of at least two (2) technical papers are required for award of the PhD.",
+  ],
+  courses: [
+    // University mandatory / research
+    { code: "EL 500", name: "Thesis", credits: C, category: "mandatory" },
+    { code: "EL 551", name: "Research Methods", credits: C, category: "mandatory" },
+    { code: "EL 655", name: "Individual Studies", credits: C, category: "mandatory" },
+    { code: "EL 656", name: "University Teaching Experience", credits: C, category: "mandatory" },
+    // Preparatory / Introductory
+    { code: "EL 401", name: "MATLAB/Simulink for Engineers", credits: C, category: "core" },
+    { code: "EL 403", name: "Introduction to Computer Applications", credits: C, category: "core" },
+    { code: "EL 405", name: "Numerical Methods", credits: C, category: "core" },
+    { code: "EL 407", name: "Probability and Statistics for Engineers", credits: C, category: "core" },
+    // Audited / elective specialisation modules (selected with supervisor)
+    { code: "EL 571", name: "Modelling and Simulation", credits: C, category: "elective" },
+    { code: "EL 572", name: "Advanced Signal Processing", credits: C, category: "elective" },
+    { code: "EL 573", name: "Artificial Intelligence in Manufacturing", credits: C, category: "elective" },
+    { code: "EL 574", name: "Microprocessor Systems", credits: C, category: "elective" },
+    { code: "EL 575", name: "Power System Planning, Protection and Operations", credits: C, category: "elective" },
+    { code: "EL 576", name: "Power System Modelling, Stability and Control", credits: C, category: "elective" },
+    { code: "EL 577", name: "Microwave Engineering and Optical Communication Systems", credits: C, category: "elective" },
+    { code: "EL 579", name: "Computer Control Systems", credits: C, category: "elective" },
+    { code: "EL 581", name: "Advanced Robotics", credits: C, category: "elective" },
+    { code: "EL 584", name: "Optimal Control Systems", credits: C, category: "elective" },
+    { code: "EL 586", name: "Mobile Communication Systems", credits: C, category: "elective" },
+    { code: "EL 590", name: "Power Systems Optimisation and Economics", credits: C, category: "elective" },
+    { code: "EL 592", name: "Green Energy and Smart Grid Systems", credits: C, category: "elective" },
+  ],
+};
+
 // ─── Mechanical Engineering ──────────────────────────────────────────────
 // Source: UMaT SPS — Faculty of Engineering, Mechanical Engineering
 // Department postgraduate modular programme (2025/2026 academic year).
@@ -523,6 +616,8 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   GEOMATIC_PHD,
   EEE_MSC_MPHIL,
   EEE_PHD,
+  EEE_MSC_MPHIL_JULY,
+  EEE_PHD_JULY,
   MECH_MSC_MPHIL,
   MECH_PHD,
   MATH_MSC_MPHIL,
