@@ -1,100 +1,65 @@
+# Real Auth Integration Plan
 
-## Stakeholder Requirements Implementation Plan
+Backend stays in your `backend/` directory (you'll run the backend prompt separately). This plan covers the **frontend changes** and the **small backend additions** needed to support force-password-change + superadmin reset.
 
-### Phase 1: Student Changes
-1. **Add reference number to profile details** — Show index number prominently in student profile/dashboard
-2. **Remove Exam Timetable** — Remove the page and its route/nav link
-3. **Clean up AI chatbot suggestions** — Remove pre-admission questions from the chatbot interface
-4. **Add download receipt at Financial Status** — Add a receipt download button for fee payments
+## 1. Backend additions (in `backend/`)
 
-### Phase 2: Accountant Changes
-1. **Fee Analytics** — Add more departments to analytics data
-2. **Student Fees filtering** — Add department/program checkbox filters
-3. **Export Reports** — Add CSV and Excel download formats alongside PDF
-4. **Announcement page** — Create fee notification page for accountant
-5. **Import feature** — Add file upload to import fee data for analytics
-6. **Graduate count** — Show number of graduates on dashboard/analytics
+Add to existing Node/Express code (not generated from scratch — your separate prompt handles the full rebuild, this is the auth-specific delta you'll need either way):
 
-### Phase 3: Dean/Admin Changes
-1. **Enroll Student** — Add Excel file upload for bulk student enrollment
-2. **System log** — Add activity log page for admins
-3. **Pass List** — Add CSV export format
+- Migration `015_password_policy.sql`:
+  - `users.must_change_password BOOLEAN DEFAULT TRUE`
+  - `users.last_password_change TIMESTAMP`
+- `authController.changePassword` — `POST /api/auth/change-password` (authenticated): verifies `old_password`, hashes new, sets `must_change_password = false`.
+- `authController.adminResetPassword` — `POST /api/auth/admin/reset-password` (super-admin only): resets a user's password to their student index number (or staff email local-part for staff) and sets `must_change_password = true`.
+- `login` response includes `must_change_password`.
+- Student creation flow auto-sets `password_hash = bcrypt(index_number)` and `must_change_password = true`.
+- Staff creation endpoint `POST /api/auth/admin/create-staff` (super-admin): create user with default password = email local-part, `must_change_password = true`.
 
-### Phase 4: Exams Officer Changes
-1. **Grade Entry** — Add delete published results feature
-2. **Publish Results** — Add delete from history + download feature
-3. **Pass List** — Change PDF to CSV, add department/program filters
-4. **Field label changes** — Change "department" to "programs" where needed
+## 2. Frontend — API client
 
-### Phase 5: Admin Role Split
-1. **Departmental Admin** — Add department field to admin users, filter all admin pages by department
-2. **Super Admin** — Add department filter dropdown on all admin pages for super admin access
+- New `src/lib/api.ts`:
+  - `API_BASE_URL` from `import.meta.env.VITE_API_BASE_URL` (fallback `http://localhost:5000/api`).
+  - `apiFetch(path, options)` attaches `Authorization: Bearer <token>` from localStorage, throws on non-2xx.
+- Add `VITE_API_BASE_URL` doc note (user sets in `.env`).
 
-### Notes
-- Supervisor: No changes, just inspection
-- All download format changes from PDF to CSV should be applied consistently across admin pages
+## 3. Frontend — Replace mock `AuthContext`
 
----
+Rewrite `src/contexts/AuthContext.tsx`:
+- `login(email, password)` → `POST /api/auth/login`, store JWT + user, expose `mustChangePassword`.
+- `changePassword(oldPwd, newPwd)` → `POST /api/auth/change-password`.
+- `logout` clears token + user.
+- On mount: if token exists, call `GET /api/auth/me` to rehydrate; on 401 clear.
+- Remove all `mockUsers`, `departmentalAdmins`, `superAdminUser` constants.
 
-## Phase 6: Accountant CSV & Bank Payment Workflow
+## 4. Force password change on first login
 
-### 6.1 Fee List CSV (accountant publishes)
-- **One row per student.** Single fee item = school fees (GH₵, with pesewas, decimal e.g. `4250.50`).
-- **Columns:** `index_number, full_name, programme, level, academic_year, semester, total_fee_ghs`
-  - `index_number` is the match key (`UMaT/PG/XXXX/YY`)
-  - `programme` included for grouping/validation; mismatches against student record are flagged but do not block import
-- **Re-upload behaviour:**
-  - Existing student (matched by index) → update `total_fee_ghs`; recompute `outstanding = total − paid_so_far`
-  - New student in CSV → create fee record
-  - Student in system but missing from CSV → leave untouched, surface in a "not in latest list" report
-  - Show a diff preview (added / updated / unchanged / removed) before commit
-- Validation: index format, programme exists, amount > 0, no duplicate index in file.
+- New page `src/pages/ChangePassword.tsx` (old + new + confirm).
+- New guard component `RequirePasswordChange` wrapping `DashboardLayout` routes: if `user.mustChangePassword`, redirect to `/change-password`; that page only allows submitting the change form (no sidebar nav links work until done).
 
-### 6.2 Bank Payment CSV (manual today, real API later)
-- Students pay at the bank; accountant uploads the bank's payment file to update fee status.
-- **Columns:** `teller_no, paid_at, index_number, amount_ghs, bank_branch, narration`
-- **Auto-match by index number** = system finds the fee record whose `index_number` matches the row and credits `amount_ghs` against it. No manual linking needed for clean rows.
-- Payments are full payments for now; partial logic deferred until requirement changes.
-- Unmatched rows (unknown index, duplicate teller_no, amount mismatch) land in an exceptions queue for the accountant to resolve manually.
-- On successful match: payment recorded, `amount_paid` increased, `is_cleared` flips when fully paid, student sees updated Financial Status + notification.
+## 5. Superadmin UI
 
-### 6.3 Service boundary (swap-ready)
-- `src/services/paymentsProvider.ts` exposes `fetchBankPayments()`.
-- **Today:** parses the uploaded bank CSV.
-- **Tomorrow:** body swapped to call the school's bank API. No other file changes.
-- The accountant still triggers the sync; the real API just removes the upload step.
+- In `src/pages/admin/ManageUsers.tsx`:
+  - Show only when `user.isSuperAdmin`: "Create Staff" dialog (name, email, role, department) → `POST /api/auth/admin/create-staff`. Toast shows the default password (email local-part).
+  - Per-row "Reset Password" button → `POST /api/auth/admin/reset-password` → toast confirms reset to index number / email local-part.
+- `ManageStudents.tsx`: per-row "Reset Password" for super-admin only.
 
-### 6.4 Out of scope (Phase 6)
-- Hubtel / MoMo / Paystack online payment providers — removed from roadmap.
+## 6. Remove mock seed data
 
----
+- `src/contexts/DataStoreContext.tsx`: replace hardcoded students/staff/payments/etc. seed arrays with empty arrays + `useEffect` loaders that fetch from backend (`/api/students`, `/api/supervisors`, …). Lists will be empty until you create real records.
+- Keep mock data ONLY for catalog/reference data that isn't user-generated (programmes, courses catalog).
 
-## Phase 7: Exams Officer — Grade Entry, CWA & Publishing
+## 7. Login page
 
-### 7.1 Grading scale (UMaT)
-| Marks | Grade | Meaning |
-|-------|-------|---------|
-| 80–100 | A | Excellent |
-| 70–79  | B | Very Good |
-| 60–69  | C | Good |
-| 50–59  | D | Pass |
-| 0–49   | F | Fail |
+- `src/pages/Login.tsx`: surface real backend errors (invalid credentials, network); after login redirect to `/change-password` if `mustChangePassword` else `/dashboard`.
 
-- Examiner enters **marks only**; system derives the letter grade from the scale above.
-- System trusts whatever the examiner types in the marks column (no plausibility checks).
+## Out of scope (this round)
 
-### 7.2 CWA calculation
-- Credit-weighted average of raw marks (not grade points):
-  `CWA = Σ(marks × credit_hours) / Σ(credit_hours)`, rounded to 2 dp.
-- Computed across all courses with recorded marks for the student.
-- **Display CWA only.** No class-of-degree bands (Distinction / Second Upper / etc.).
+- Forgot-password-by-email (no SMTP yet). For now self-service recovery = ask superadmin to reset.
+- Migrating every page's mock arrays — only the user/student/staff lists are de-mocked now. Other domain mocks (results, payments) stay until backend endpoints exist; we can de-mock them page-by-page next.
 
-### 7.3 Draft → Publish workflow
-- New batch starts in **Draft**. Examiner can edit marks freely; students do not see them.
-- "Publish Results" flips the batch to **Published**, snapshots marks/grades/CWA, and exposes them to students + dean.
-- Published batch can be unpublished/deleted by the examiner (already in Phase 4).
+## Files touched
 
-### 7.4 Out of scope (Phase 7)
-- Class-of-degree banding.
-- Grade-point GPA (we use raw-mark CWA).
-- Resit / supplementary logic.
+- new: `src/lib/api.ts`, `src/pages/ChangePassword.tsx`, `src/components/RequirePasswordChange.tsx`, `backend/src/db/migrations/015_password_policy.sql`
+- edit: `src/contexts/AuthContext.tsx`, `src/contexts/DataStoreContext.tsx`, `src/pages/Login.tsx`, `src/pages/admin/ManageUsers.tsx`, `src/pages/admin/ManageStudents.tsx`, `src/App.tsx` (mount guard + route), `backend/src/controllers/authController.js`, `backend/src/routes/authRoutes.js`, `backend/src/controllers/studentController.js` (hash index# on create)
+
+Confirm and I'll implement.
