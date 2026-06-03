@@ -1,7 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FileText, CheckCircle, Clock, Eye, Send, ArrowLeft, Bot, Download, XCircle, Loader2, FileWarning, ExternalLink } from "lucide-react";
+import { FileText, CheckCircle, Clock, Eye, Send, ArrowLeft, Bot, Download, XCircle, Loader2, FileWarning } from "lucide-react";
 import { useEffect, useState } from "react";
-import mammoth from "mammoth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -29,12 +28,12 @@ const ReviewSubmissions = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [publicFileUrl, setPublicFileUrl] = useState<string | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [docxError, setDocxError] = useState(false);
   const [fileKind, setFileKind] = useState<"pdf" | "docx" | "doc" | "image" | "other" | null>(null);
-  const [preparingDownload, setPreparingDownload] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [newRemark, setNewRemark] = useState("");
   const [saving, setSaving] = useState(false);
   const [showAI, setShowAI] = useState(true);
@@ -50,64 +49,59 @@ const ReviewSubmissions = () => {
     setLoading(false);
   };
 
-  useEffect(() => { loadSubmissions(); }, []);
+  useEffect(() => {
+    loadSubmissions();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel('thesis_submissions_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'thesis_submissions' },
+        () => { loadSubmissions(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   useEffect(() => {
-    return () => {
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-    };
+    return () => { if (downloadUrl) URL.revokeObjectURL(downloadUrl); };
   }, [downloadUrl]);
 
   const openSubmission = async (sub: Submission) => {
     setSelectedSubmission(sub);
     setNewRemark(sub.feedback || "");
-    setFileUrl(null);
-    setDownloadUrl(null);
     setPublicFileUrl(null);
+    setDownloadUrl(null);
     setDocxHtml(null);
+    setDocxError(false);
     setFileKind(null);
-    setPreparingDownload(true);
+    setPreviewing(true);
+
     try {
       const name = sub.file_name.toLowerCase();
-      const { data, error } = await supabase.storage.from("thesis-files").download(sub.file_path);
-      if (error || !data) throw error || new Error("No file");
-      // Force a proper MIME type so the browser's built-in PDF viewer renders inline
-      const mime = name.endsWith(".pdf")
-        ? "application/pdf"
-        : name.endsWith(".docx")
-        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        : name.endsWith(".doc")
-        ? "application/msword"
-        : data.type || "application/octet-stream";
-      const typedBlob = data.type === mime ? data : new Blob([await data.arrayBuffer()], { type: mime });
-      const objectUrl = URL.createObjectURL(typedBlob);
-      setFileUrl(objectUrl);
-      setDownloadUrl(objectUrl);
       const { data: pub } = supabase.storage.from("thesis-files").getPublicUrl(sub.file_path);
-      setPublicFileUrl(pub.publicUrl);
+      const url = pub.publicUrl;
+      setPublicFileUrl(url);
 
       if (name.endsWith(".pdf")) {
         setFileKind("pdf");
       } else if (name.endsWith(".docx")) {
         setFileKind("docx");
         try {
-          const arrayBuffer = await typedBlob.arrayBuffer();
-          const result = await mammoth.convertToHtml(
-            { arrayBuffer },
-            {
-              styleMap: [
-                "p[style-name='Title'] => h1.doc-title:fresh",
-                "p[style-name='Subtitle'] => h2.doc-subtitle:fresh",
-                "p[style-name='Heading 1'] => h1:fresh",
-                "p[style-name='Heading 2'] => h2:fresh",
-                "p[style-name='Heading 3'] => h3:fresh",
-                "p[style-name='Quote'] => blockquote:fresh",
-              ],
-            }
-          );
+          const mammoth = (await import("mammoth")).default;
+          const res = await fetch(url);
+          const arrayBuffer = await res.arrayBuffer();
+          const result = await mammoth.convertToHtml({ arrayBuffer }, {
+            styleMap: [
+              "p[style-name='Heading 1'] => h1:fresh",
+              "p[style-name='Heading 2'] => h2:fresh",
+              "p[style-name='Heading 3'] => h3:fresh",
+            ],
+          });
           setDocxHtml(result.value);
-        } catch (e: any) {
-          setDocxHtml(null);
+        } catch {
+          setDocxError(true);
         }
       } else if (name.endsWith(".doc")) {
         setFileKind("doc");
@@ -116,14 +110,20 @@ const ReviewSubmissions = () => {
       } else {
         setFileKind("other");
       }
+
+      // Prepare download blob separately
+      const { data: blob, error: dlErr } = await supabase.storage.from("thesis-files").download(sub.file_path);
+      if (!dlErr && blob) {
+        setDownloadUrl(URL.createObjectURL(blob));
+      }
     } catch (err: any) {
-      toast({ title: "File preparation failed", description: err.message, variant: "destructive" });
+      toast({ title: "Failed to load file", description: err.message, variant: "destructive" });
     } finally {
-      setPreparingDownload(false);
+      setPreviewing(false);
     }
   };
 
-  const submitReview = async (status: "Approved" | "Rejected" | "Reviewed") => {
+  const submitReview = async (status: "Approved" | "Rejected") => {
     if (!selectedSubmission) return;
     setSaving(true);
     const { error } = await supabase
@@ -146,6 +146,28 @@ const ReviewSubmissions = () => {
     setNewRemark("");
   };
 
+  const sendFeedbackOnly = async () => {
+    if (!selectedSubmission || !newRemark.trim()) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("thesis_submissions")
+      .update({
+        feedback: newRemark.trim(),
+        reviewed_by: user?.name,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", selectedSubmission.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Save failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Feedback sent" });
+    await loadSubmissions();
+    setSelectedSubmission(null);
+    setNewRemark("");
+  };
+
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -153,12 +175,11 @@ const ReviewSubmissions = () => {
   if (selectedSubmission) {
     return (
       <DashboardLayout>
-        {/* Header */}
         <div className="mb-6">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setSelectedSubmission(null); setNewRemark(""); setDownloadUrl(null); }}
+            onClick={() => { setSelectedSubmission(null); setNewRemark(""); }}
             className="mb-3 -ml-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft size={16} className="mr-1" /> Back to submissions
@@ -174,19 +195,16 @@ const ReviewSubmissions = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {/* AI Toggle */}
               <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
                 <Bot size={14} className="text-primary" />
                 <span className="text-xs font-medium text-foreground">AI</span>
                 <Switch checked={showAI} onCheckedChange={setShowAI} className="scale-75" />
               </div>
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                  selectedSubmission.status === "Pending" ? "bg-warning/10 text-warning" :
-                  selectedSubmission.status === "Rejected" ? "bg-destructive/10 text-destructive" :
-                  "bg-success/10 text-success"
-                }`}
-              >
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                selectedSubmission.status === "Pending" ? "bg-warning/10 text-warning" :
+                selectedSubmission.status === "Rejected" ? "bg-destructive/10 text-destructive" :
+                "bg-success/10 text-success"
+              }`}>
                 {selectedSubmission.status === "Pending" ? <Clock size={12} /> :
                  selectedSubmission.status === "Rejected" ? <XCircle size={12} /> : <CheckCircle size={12} />}
                 {selectedSubmission.status}
@@ -195,7 +213,6 @@ const ReviewSubmissions = () => {
           </div>
         </div>
 
-        {/* Main content grid */}
         <div className={`grid gap-6 ${showAI ? "lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]" : "grid-cols-1"}`}>
           <div className="space-y-6 min-w-0">
             {/* Document viewer */}
@@ -206,13 +223,6 @@ const ReviewSubmissions = () => {
                   <span className="text-sm font-medium text-foreground truncate">{selectedSubmission.file_name}</span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {fileUrl && (fileKind === "pdf" || fileKind === "image") && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink size={14} className="mr-1.5" />Open
-                      </a>
-                    </Button>
-                  )}
                   {downloadUrl ? (
                     <Button variant="outline" size="sm" asChild>
                       <a href={downloadUrl} download={selectedSubmission.file_name}>
@@ -221,31 +231,35 @@ const ReviewSubmissions = () => {
                     </Button>
                   ) : (
                     <Button variant="outline" size="sm" disabled>
-                      {preparingDownload ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Download size={14} className="mr-1.5" />}
-                      {preparingDownload ? "Preparing" : "Download"}
+                      <Loader2 size={14} className="mr-1.5 animate-spin" />Preparing
                     </Button>
                   )}
                 </div>
               </div>
+
               <div className="h-[85vh] bg-muted/20">
-                {!fileUrl ? (
+                {previewing ? (
                   <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
                     <Loader2 size={20} className="animate-spin mr-2" /> Loading document...
                   </div>
                 ) : fileKind === "pdf" ? (
                   <iframe
-                    src={`${fileUrl}#view=FitH&toolbar=1&navpanes=0`}
+                    src={`${publicFileUrl}#toolbar=1&navpanes=0`}
                     title={selectedSubmission.file_name}
-                    className="w-full h-full border-0 bg-background"
+                    className="w-full h-full border-0"
                   />
                 ) : fileKind === "docx" ? (
-                  docxHtml ? (
+                  docxError ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
+                      <FileWarning size={28} className="text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground max-w-sm">
+                        Could not render this DOCX file. Please download to view.
+                      </p>
+                    </div>
+                  ) : docxHtml ? (
                     <div className="h-full overflow-auto px-6 py-8">
-                      <div className="mx-auto w-full max-w-[100%] xl:max-w-[9.5in] bg-white text-neutral-900 rounded-md border border-border shadow-lg px-8 py-10 xl:px-12 xl:py-12 docx-page">
-                        <div
-                          className="docx-content"
-                          dangerouslySetInnerHTML={{ __html: docxHtml }}
-                        />
+                      <div className="mx-auto w-full max-w-[9.5in] bg-white text-neutral-900 rounded-md border border-border shadow-lg px-8 py-10 docx-page">
+                        <div className="docx-content" dangerouslySetInnerHTML={{ __html: docxHtml }} />
                       </div>
                     </div>
                   ) : (
@@ -257,24 +271,24 @@ const ReviewSubmissions = () => {
                   <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-6">
                     <FileWarning size={28} className="text-muted-foreground" />
                     <p className="text-sm text-muted-foreground max-w-sm">
-                      Legacy <code className="px-1 py-0.5 rounded bg-muted text-xs">.doc</code> files can't be previewed in the browser.
-                      Ask the student to re-upload as <strong>.docx</strong> or <strong>.pdf</strong>, or download to view.
+                      Legacy <code className="px-1 py-0.5 rounded bg-muted text-xs">.doc</code> files can't be previewed.
+                      Ask the student to re-upload as <strong>.docx</strong> or <strong>.pdf</strong>.
                     </p>
                   </div>
                 ) : fileKind === "image" ? (
                   <div className="h-full overflow-auto flex items-center justify-center p-4">
-                    <img src={fileUrl} alt={selectedSubmission.file_name} className="max-w-full max-h-full rounded-md border border-border shadow-sm" />
+                    <img src={publicFileUrl!} alt={selectedSubmission.file_name} className="max-w-full max-h-full rounded-md border border-border shadow-sm" />
                   </div>
-                ) : (
+                ) : fileKind === "other" ? (
                   <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground text-sm text-center">
                     <FileWarning size={28} />
-                    <span>Preview not supported for this file type. Please download to view.</span>
+                    <span>Preview not supported. Please download to view.</span>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
 
-            {/* Remark input */}
+            {/* Feedback */}
             <div className="bg-card rounded-xl border border-border p-5">
               <h2 className="font-display text-lg font-bold text-foreground mb-3">Feedback</h2>
               <Textarea
@@ -290,14 +304,13 @@ const ReviewSubmissions = () => {
                 <Button onClick={() => submitReview("Rejected")} disabled={saving} variant="destructive">
                   <XCircle size={14} className="mr-1.5" /> Reject
                 </Button>
-                <Button onClick={() => submitReview("Reviewed")} disabled={saving || !newRemark.trim()} variant="outline">
-                  <Send size={14} className="mr-1.5" /> Send Feedback
+                <Button onClick={sendFeedbackOnly} disabled={saving || !newRemark.trim()} variant="outline">
+                  <Send size={14} className="mr-1.5" /> Send Feedback Only
                 </Button>
               </div>
             </div>
           </div>
 
-          {/* AI Sidebar */}
           {showAI && (
             <div className="space-y-4">
               <AIFeedbackPanel

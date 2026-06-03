@@ -1,4 +1,5 @@
 const db = require("../db");
+const XLSX = require("xlsx");
 
 // GET /api/fees/student/:studentId
 exports.getByStudent = async (req, res) => {
@@ -112,6 +113,149 @@ exports.getSummary = async (req, res) => {
 
     const result = await db.query(sql, params);
     res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/fees/parse-bulk
+// Accepts multipart file (CSV or XLSX)
+// Returns parsed rows: { rows: [{ index_number, total_amount, academic_year, semester }, ...] }
+exports.parseBulk = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const { mimetype, buffer } = req.file;
+    const isExcel = /\.(xlsx?|xls)$|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|application\/vnd\.ms-excel/i.test(
+      mimetype || req.file.originalname
+    );
+
+    let rows = [];
+    if (isExcel) {
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    } else {
+      const text = buffer.toString("utf-8");
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      rows = lines.map((line) => {
+        const result = [];
+        let current = "";
+        let inQuotes = false;
+        for (const ch of line) {
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (ch === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = "";
+          } else current += ch;
+        }
+        result.push(current.trim());
+        return result;
+      });
+    }
+
+    if (rows.length < 2) return res.status(400).json({ error: "File must contain header and at least one row" });
+
+    // map columns
+    const headers = rows[0];
+    const normalized = headers.map((h) => String(h).toLowerCase().replace(/[^a-z]/g, ""));
+    const colMap = {};
+    const knownCols = {
+      index_number: ["index", "indexnumber", "indexno", "studentid", "regno", "regnumber"],
+      total_amount: ["amount", "totalamount", "fee", "fees", "totalfee", "totalfees"],
+      academic_year: ["year", "academicyear", "academicyear", "session"],
+      semester: ["semester", "sem", "term"],
+    };
+    for (const [field, aliases] of Object.entries(knownCols)) {
+      const idx = normalized.findIndex((h) => aliases.includes(h));
+      if (idx !== -1) colMap[field] = idx;
+    }
+    if (Object.keys(colMap).length < 2) {
+      colMap.index_number = 0;
+      colMap.total_amount = 1;
+      colMap.academic_year = 2;
+      colMap.semester = 3;
+    }
+
+    // parse rows
+    const parsed = rows.slice(1).map((cols) => ({
+      index_number: (cols[colMap.index_number ?? 0] || "").toString().trim(),
+      total_amount: parseFloat((cols[colMap.total_amount ?? 1] || "0").toString().replace(/[^\d.]/g, "")) || 0,
+      academic_year: (cols[colMap.academic_year ?? 2] || "").toString().trim(),
+      semester: (cols[colMap.semester ?? 3] || "").toString().trim(),
+    })).filter((f) => f.index_number && f.total_amount > 0);
+
+    if (parsed.length === 0) {
+      return res.status(400).json({ error: "No valid fee records found" });
+    }
+
+    res.json({ rows: parsed });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/fees/upload-bulk
+// Accepts: { fees: [{ index_number, total_amount, academic_year, semester }, ...] }
+// Creates fee records for multiple students
+exports.uploadBulk = async (req, res) => {
+  try {
+    const { fees } = req.body;
+    if (!Array.isArray(fees) || fees.length === 0) {
+      return res.status(400).json({ error: "No fee records to upload" });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < fees.length; i++) {
+      const { index_number, total_amount, academic_year, semester } = fees[i];
+      if (!index_number || !total_amount) {
+        errors.push(`Row ${i + 1}: Missing required fields`);
+        continue;
+      }
+
+      try {
+        // Find student by index number
+        const student = await db.query(
+          "SELECT id FROM students WHERE index_number = $1",
+          [index_number]
+        );
+
+        if (student.rows.length === 0) {
+          errors.push(`Row ${i + 1}: Student with index ${index_number} not found`);
+          continue;
+        }
+
+        const studentId = student.rows[0].id;
+        const year = academic_year || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`;
+        const sem = semester || "First";
+
+        // Check if record already exists
+        const existing = await db.query(
+          "SELECT id FROM fee_records WHERE student_id = $1 AND academic_year = $2 AND semester = $3",
+          [studentId, year, sem]
+        );
+
+        if (existing.rows.length > 0) {
+          errors.push(`Row ${i + 1}: Fee record already exists for ${index_number} in ${year} ${sem}`);
+          continue;
+        }
+
+        // Create fee record
+        const result = await db.query(
+          `INSERT INTO fee_records (student_id, academic_year, semester, total_amount, amount_paid, status, is_cleared)
+           VALUES ($1, $2, $3, $4, 0, 'Unpaid', FALSE)
+           RETURNING *`,
+          [studentId, year, sem, total_amount]
+        );
+
+        created.push({ index_number, ...result.rows[0] });
+      } catch (err) {
+        errors.push(`Row ${i + 1}: ${err.message}`);
+      }
+    }
+
+    res.status(201).json({ created, errors: errors.length > 0 ? errors : undefined });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

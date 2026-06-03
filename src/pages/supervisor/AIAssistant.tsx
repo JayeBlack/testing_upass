@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supervisor-ai`;
 
@@ -383,68 +384,81 @@ const AIAssistant = () => {
 };
 
 /* ── Automated Checks sub-component ── */
-const mockChecks = [
-  { student: "Kwame Mensah", chapter: "Chapter 3", issues: [
-    { issue: "Missing references in section 3.2", severity: "high" as const, section: "References" },
-    { issue: "Inconsistent heading formatting", severity: "medium" as const, section: "Formatting" },
-    { issue: "Figure 3.1 lacks a caption", severity: "low" as const, section: "Figures" },
-  ]},
-  { student: "Ama Serwaa", chapter: "Chapter 2", issues: [
-    { issue: "Literature review does not cover recent publications (post-2023)", severity: "high" as const, section: "Content" },
-    { issue: "Paragraph exceeds recommended 300-word limit in section 2.4", severity: "low" as const, section: "Formatting" },
-  ]},
-  { student: "Efua Dankwah", chapter: "Chapter 4", issues: [
-    { issue: "No issues found — submission meets all guidelines", severity: "low" as const, section: "All" },
-  ]},
-];
-
 const severityConfig = {
   high: { color: "bg-destructive/10 text-destructive", icon: AlertTriangle },
   medium: { color: "bg-warning/10 text-warning", icon: Info },
   low: { color: "bg-success/10 text-success", icon: CheckCircle },
 };
 
-const AutomatedChecks = () => (
-  <div className="space-y-4">
-    <div className="bg-card rounded-xl border border-border p-5">
-      <div className="flex items-center gap-2 mb-1">
-        <AlertTriangle size={16} className="text-warning" />
-        <h3 className="font-display font-bold text-foreground">Automated Quality Checks</h3>
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">
-        AI-powered analysis of student submissions for formatting, references, and completeness.
-      </p>
-      <Badge variant="outline" className="text-xs">
-        <Sparkles size={10} className="mr-1" /> AI-generated · Last scanned Feb 12, 2026
-      </Badge>
-    </div>
 
-    {mockChecks.map((check, ci) => (
-      <div key={ci} className="bg-card rounded-xl border border-border p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-foreground">{check.student} — {check.chapter}</h4>
-          <Badge variant={check.issues.some((i) => i.severity === "high") ? "destructive" : "secondary"} className="text-xs">
-            {check.issues.filter((i) => i.severity === "high").length} critical
-          </Badge>
+
+interface RecentSubmission {
+  id: string;
+  student_name: string;
+  stage: string;
+  status: string;
+  submitted_at: string;
+}
+
+const AutomatedChecks = () => {
+  const [subs, setSubs] = useState<RecentSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("thesis_submissions")
+      .select("id, student_name, stage, status, submitted_at")
+      .order("submitted_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => { setSubs((data as RecentSubmission[]) || []); setLoading(false); });
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card rounded-xl border border-border p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <AlertTriangle size={16} className="text-warning" />
+          <h3 className="font-display font-bold text-foreground">Recent Submissions</h3>
         </div>
-        <div className="space-y-2">
-          {check.issues.map((issue, ii) => {
-            const cfg = severityConfig[issue.severity];
-            const Icon = cfg.icon;
-            return (
-              <div key={ii} className={`flex items-start gap-3 p-3 rounded-lg ${cfg.color}`}>
-                <Icon size={14} className="mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{issue.issue}</p>
-                  <p className="text-xs opacity-70 mt-0.5">{issue.section}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Latest thesis submissions from your students. Use the Chat tab to ask the AI for detailed analysis.
+        </p>
       </div>
-    ))}
-  </div>
-);
+
+      {loading ? (
+        <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
+          <Loader2 size={16} className="animate-spin mr-2" /> Loading...
+        </div>
+      ) : subs.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-5 text-center text-sm text-muted-foreground">
+          No submissions yet.
+        </div>
+      ) : (
+        subs.map((s) => {
+          const cfg = s.status === "Pending" ? severityConfig.medium
+            : s.status === "Rejected" ? severityConfig.high
+            : severityConfig.low;
+          const Icon = cfg.icon;
+          return (
+            <div key={s.id} className="bg-card rounded-xl border border-border p-5">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-foreground">{s.student_name} — {s.stage}</h4>
+                <Badge variant={s.status === "Rejected" ? "destructive" : s.status === "Pending" ? "outline" : "secondary"} className="text-xs">
+                  {s.status}
+                </Badge>
+              </div>
+              <div className={`flex items-center gap-3 p-3 rounded-lg ${cfg.color}`}>
+                <Icon size={14} className="shrink-0" />
+                <p className="text-sm">
+                  Submitted {new Date(s.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+};
 
 export default AIAssistant;

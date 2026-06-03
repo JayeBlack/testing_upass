@@ -221,6 +221,16 @@ exports.adminCreateStaff = async (req, res) => {
        RETURNING id, email, role, first_name, last_name, phone, department_id, is_super_admin, must_change_password, created_at`,
       [email, hash, role, first_name, last_name, phone || null, department_id || null, is_super_admin]
     );
+
+    // Create supervisor record if role is Supervisor
+    if (role === "Supervisor") {
+      const staff_id = email.split('@')[0].toUpperCase();
+      await db.query(
+        "INSERT INTO supervisors (user_id, staff_id, department_id, is_active) VALUES ($1, $2, $3, TRUE)",
+        [result.rows[0].id, staff_id, department_id || null]
+      );
+    }
+
     res.status(201).json({ user: result.rows[0], default_password: defaultPwd });
   } catch (err) {
     res.status(500).json({ error: err.message });

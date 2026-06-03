@@ -1,16 +1,23 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Banknote, CheckCircle, AlertCircle, Clock, Upload, CreditCard, Download } from "lucide-react";
-import { useState } from "react";
+import { Banknote, CheckCircle, AlertCircle, Clock, Upload, CreditCard, Download, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import umatLogo from "@/assets/umat-logo.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
 
-const fees = [
-  { semester: "Semester 1, 2025/2026", totalNum: 5200, paidNum: 5200, status: "Paid" },
-  { semester: "Semester 2, 2024/2025", totalNum: 5200, paidNum: 5200, status: "Paid" },
-  { semester: "Semester 1, 2024/2025", totalNum: 4800, paidNum: 4800, status: "Paid" },
-  { semester: "Semester 2, 2023/2024", totalNum: 4800, paidNum: 3200, status: "Partial" },
-];
+interface FeeRecord {
+  id: string;
+  academic_year: string;
+  semester: string;
+  total_amount: number;
+  amount_paid: number;
+  outstanding: number;
+  status: string;
+  is_cleared: boolean;
+}
+
+const fees: FeeRecord[] = [];
 
 const formatCurrency = (amount: number) => `GHS ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 const formatCurrencyDisplay = (amount: number) => `GH\u20B5 ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -18,18 +25,31 @@ const formatCurrencyDisplay = (amount: number) => `GH\u20B5 ${amount.toLocaleStr
 const statusConfig: Record<string, { icon: React.ReactNode; className: string }> = {
   Paid: { icon: <CheckCircle size={14} />, className: "bg-success/10 text-success" },
   Partial: { icon: <AlertCircle size={14} />, className: "bg-warning/10 text-warning" },
-  Pending: { icon: <Clock size={14} />, className: "bg-muted text-muted-foreground" },
+  Unpaid: { icon: <Clock size={14} />, className: "bg-muted text-muted-foreground" },
 };
 
 const FinancialStatus = () => {
-  const totalOwed = 1600;
-  const [showPayModal, setShowPayModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"online" | "receipt" | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const [fees, setFees] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"online" | "receipt" | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    apiFetch<FeeRecord[]>(`/fees/student/${user.id}`)
+      .then(setFees)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user?.id]);
+
+  const totalAmount = fees.reduce((sum, f) => sum + f.total_amount, 0);
+  const totalPaid = fees.reduce((sum, f) => sum + f.amount_paid, 0);
+  const totalOwed = fees.reduce((sum, f) => sum + f.outstanding, 0);
 
 
-  const handleDownloadReceipt = async (fee: typeof fees[0]) => {
+  const handleDownloadReceipt = async (fee: FeeRecord) => {
     try {
       const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF();
@@ -123,10 +143,11 @@ const FinancialStatus = () => {
 
       // Table rows
       const paymentRows = [
+        ["Academic Year", fee.academic_year],
         ["Semester", fee.semester],
-        ["Total Fee", formatCurrency(fee.totalNum)],
-        ["Amount Paid", formatCurrency(fee.paidNum)],
-        ["Outstanding Balance", formatCurrency(fee.totalNum - fee.paidNum)],
+        ["Total Fee", formatCurrency(fee.total_amount)],
+        ["Amount Paid", formatCurrency(fee.amount_paid)],
+        ["Outstanding Balance", formatCurrency(fee.outstanding)],
       ];
 
       doc.setFont("helvetica", "normal");
@@ -160,8 +181,8 @@ const FinancialStatus = () => {
       doc.text(`Generated on ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB")}`, pageW / 2, 274, { align: "center" });
       doc.setTextColor(0, 0, 0);
 
-      doc.save(`UMaT_Fee_Receipt_${fee.semester.replace(/[\s,\/]/g, "_")}.pdf`);
-      toast({ title: "Receipt downloaded", description: `Payment receipt for ${fee.semester}` });
+      doc.save(`UMaT_Fee_Receipt_${fee.academic_year.replace(/\//, "-")}_${fee.semester}.pdf`);
+      toast({ title: "Receipt downloaded", description: `Payment receipt for ${fee.academic_year} ${fee.semester}` });
     } catch {
       toast({ title: "Download failed", description: "Could not generate receipt", variant: "destructive" });
     }
@@ -179,21 +200,21 @@ const FinancialStatus = () => {
           <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center mb-3">
             <Banknote size={18} className="text-secondary-foreground" />
           </div>
-          <p className="text-2xl font-bold font-display text-foreground">GH₵ 20,000</p>
+          <p className="text-2xl font-bold font-display text-foreground">{loading ? "—" : formatCurrencyDisplay(totalAmount)}</p>
           <p className="text-sm text-muted-foreground mt-1">Total Fees</p>
         </div>
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center mb-3">
             <CheckCircle size={18} className="text-success" />
           </div>
-          <p className="text-2xl font-bold font-display text-foreground">GH₵ 18,400</p>
+          <p className="text-2xl font-bold font-display text-foreground">{loading ? "—" : formatCurrencyDisplay(totalPaid)}</p>
           <p className="text-sm text-muted-foreground mt-1">Total Paid</p>
         </div>
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center mb-3">
             <AlertCircle size={18} className="text-destructive" />
           </div>
-          <p className="text-2xl font-bold font-display text-foreground">GH₵ {totalOwed.toLocaleString()}</p>
+          <p className="text-2xl font-bold font-display text-foreground">{loading ? "—" : formatCurrencyDisplay(totalOwed)}</p>
           <p className="text-sm text-muted-foreground mt-1">Outstanding Balance</p>
         </div>
       </div>
@@ -297,69 +318,87 @@ const FinancialStatus = () => {
       )}
 
       <div className="bg-card rounded-xl border border-border overflow-hidden hidden md:block">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Semester</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Paid</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Balance</th>
-                <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Receipt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fees.map((f) => {
-                const cfg = statusConfig[f.status] || statusConfig.Pending;
-                return (
-                  <tr key={f.semester} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-foreground">{f.semester}</td>
-                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.totalNum)}</td>
-                    <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.paidNum)}</td>
-                    <td className="px-6 py-4 text-sm text-right font-medium text-foreground">{formatCurrencyDisplay(f.totalNum - f.paidNum)}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
-                        {cfg.icon}
-                        {f.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button onClick={() => handleDownloadReceipt(f)} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Download receipt" aria-label="Download receipt">
-                        <Download size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            <Loader2 size={18} className="animate-spin mr-2" /> Loading fee records...
+          </div>
+        ) : fees.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground text-sm">No fee records found</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Academic Year</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Semester</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Paid</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Balance</th>
+                  <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="text-center px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Receipt</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fees.map((f) => {
+                  const cfg = statusConfig[f.status] || statusConfig.Unpaid;
+                  return (
+                    <tr key={f.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-foreground">{f.academic_year}</td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">{f.semester}</td>
+                      <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.total_amount)}</td>
+                      <td className="px-6 py-4 text-sm text-right text-muted-foreground">{formatCurrencyDisplay(f.amount_paid)}</td>
+                      <td className="px-6 py-4 text-sm text-right font-medium text-foreground">{formatCurrencyDisplay(f.outstanding)}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
+                          {cfg.icon}
+                          {f.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button onClick={() => handleDownloadReceipt(f)} className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Download receipt" aria-label="Download receipt">
+                          <Download size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 md:hidden">
-        {fees.map((f) => {
-          const cfg = statusConfig[f.status] || statusConfig.Pending;
-          return (
-            <div key={f.semester} className="bg-card rounded-xl border border-border p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-foreground">{f.semester}</p>
-                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
-                  {cfg.icon}
-                  {f.status}
-                </span>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            <Loader2 size={18} className="animate-spin mr-2" /> Loading...
+          </div>
+        ) : fees.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground text-sm">No fee records found</div>
+        ) : (
+          fees.map((f) => {
+            const cfg = statusConfig[f.status] || statusConfig.Unpaid;
+            return (
+              <div key={f.id} className="bg-card rounded-xl border border-border p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-foreground">{f.academic_year} — {f.semester}</p>
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
+                    {cfg.icon}
+                    {f.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div><p className="text-muted-foreground">Amount</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.total_amount)}</p></div>
+                  <div><p className="text-muted-foreground">Paid</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.amount_paid)}</p></div>
+                  <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.outstanding)}</p></div>
+                </div>
+                <button onClick={() => handleDownloadReceipt(f)} className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors">
+                  <Download size={14} /> Download Receipt
+                </button>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div><p className="text-muted-foreground">Amount</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.totalNum)}</p></div>
-                <div><p className="text-muted-foreground">Paid</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.paidNum)}</p></div>
-                <div><p className="text-muted-foreground">Balance</p><p className="font-medium text-foreground">{formatCurrencyDisplay(f.totalNum - f.paidNum)}</p></div>
-              </div>
-              <button onClick={() => handleDownloadReceipt(f)} className="w-full mt-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors">
-                <Download size={14} /> Download Receipt
-              </button>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </DashboardLayout>
   );

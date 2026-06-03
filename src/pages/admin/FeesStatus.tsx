@@ -1,147 +1,146 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { CheckCircle, XCircle, Search, Filter, Upload } from "lucide-react";
-import { useState, useRef } from "react";
+import { CheckCircle, XCircle, Search, Filter, Upload, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
-import { readSheetFile, SHEET_ACCEPT } from "@/lib/sheet-import";
+import { apiFetch } from "@/lib/api";
 
 interface FeeRecord {
-  name: string;
-  index: string;
-  department: string;
-  program: string;
-  totalFees: number;
-  amountPaid: number;
+  id: string;
+  index_number: string;
+  first_name: string;
+  last_name: string;
+  program_name: string;
+  department_name: string;
+  academic_year: string;
+  semester: string;
+  total_amount: number;
+  amount_paid: number;
   outstanding: number;
-  cleared: boolean;
+  status: string;
+  is_cleared: boolean;
 }
-
-const initialRecords: FeeRecord[] = [
-  { name: "Kwame Mensah", index: "UMaT/PG/0234/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, outstanding: 0, cleared: true },
-  { name: "Ama Serwaa", index: "UMaT/PG/0198/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, outstanding: 0, cleared: true },
-  { name: "Yaw Boateng", index: "UMaT/PG/0312/22", department: "Computer Science", program: "MPhil CS", totalFees: 5200, amountPaid: 3400, outstanding: 1800, cleared: false },
-  { name: "Efua Dankwah", index: "UMaT/PG/0287/22", department: "Computer Science", program: "MSc. IT", totalFees: 5200, amountPaid: 5200, outstanding: 0, cleared: true },
-  { name: "Kofi Adjei", index: "UMaT/PG/0345/22", department: "Computer Science", program: "MPhil CS", totalFees: 5200, amountPaid: 2600, outstanding: 2600, cleared: false },
-  { name: "Abena Owusu", index: "UMaT/PG/0401/23", department: "Mining Engineering", program: "MSc. Mining Eng", totalFees: 6000, amountPaid: 6000, outstanding: 0, cleared: true },
-  { name: "Yaw Frimpong", index: "UMaT/PG/0178/21", department: "Mining Engineering", program: "MSc. Mining Eng", totalFees: 6000, amountPaid: 4500, outstanding: 1500, cleared: false },
-  { name: "Esi Appiah", index: "UMaT/PG/0145/21", department: "Electrical Engineering", program: "MSc. Electrical Eng", totalFees: 5500, amountPaid: 5500, outstanding: 0, cleared: true },
-  { name: "Akua Mensah", index: "UMaT/PG/0112/21", department: "Electrical Engineering", program: "MSc. Electrical Eng", totalFees: 5500, amountPaid: 3000, outstanding: 2500, cleared: false },
-  { name: "Nana Agyei", index: "UMaT/PG/0420/23", department: "Mechanical Engineering", program: "MSc. Mechanical Eng", totalFees: 5800, amountPaid: 5800, outstanding: 0, cleared: true },
-];
-
-const departments = [...new Set(initialRecords.map((f) => f.department))];
-const programs = [...new Set(initialRecords.map((f) => f.program))];
 
 const FeesStatus = () => {
   const { user } = useAuth();
   const { isSuperAdmin, adminDepartment } = useAdminDepartment();
   const isAccountant = user?.role === "Accountant";
-  const [records, setRecords] = useState<FeeRecord[]>(initialRecords);
+  const [records, setRecords] = useState<FeeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "cleared" | "owing">("all");
   const [deptFilter, setDeptFilter] = useState<string>("all");
   const [progFilter, setProgFilter] = useState<string>("all");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [importPreview, setImportPreview] = useState<FeeRecord[]>([]);
+  const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleToggleClearance = (index: string) => {
-    setRecords((prev) =>
-      prev.map((r) => {
-        if (r.index !== index) return r;
-        const newCleared = !r.cleared;
-        toast({
-          title: newCleared ? "Student Cleared" : "Clearance Revoked",
-          description: `${r.name} (${r.index}) has been ${newCleared ? "cleared" : "revoked"}.`,
-        });
-        return { ...r, cleared: newCleared };
-      })
-    );
+  useEffect(() => {
+    loadFees();
+  }, []);
+
+  const loadFees = async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch<FeeRecord[]>("/fees");
+      setRecords(data || []);
+    } catch {
+      // backend offline
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const parsePaymentRows = (rows: string[][]): FeeRecord[] => {
-    if (rows.length < 2) return [];
-    const headers = rows[0].map((h) => h.trim().toLowerCase().replace(/"/g, ""));
-    const nameIdx = headers.findIndex((h) => h.includes("name") || h.includes("student"));
-    const indexIdx = headers.findIndex((h) => h.includes("index") || h.includes("id") || h.includes("number"));
-    const deptIdx = headers.findIndex((h) => h.includes("department") || h.includes("dept"));
-    const progIdx = headers.findIndex((h) => h.includes("programme") || h.includes("program"));
-    const totalIdx = headers.findIndex((h) => h.includes("total") || h.includes("fee"));
-    const paidIdx = headers.findIndex((h) => h.includes("paid") || h.includes("amount"));
-
-    return rows.slice(1).filter((r) => r.some((c) => c !== "")).map((cols) => {
-      const totalFees = parseFloat(cols[totalIdx >= 0 ? totalIdx : 4] || "0") || 0;
-      const amountPaid = parseFloat(cols[paidIdx >= 0 ? paidIdx : 5] || "0") || 0;
-      return {
-        name: cols[nameIdx >= 0 ? nameIdx : 0] || "",
-        index: cols[indexIdx >= 0 ? indexIdx : 1] || "",
-        department: cols[deptIdx >= 0 ? deptIdx : 2] || "",
-        program: cols[progIdx >= 0 ? progIdx : 3] || "",
-        totalFees,
-        amountPaid,
-        outstanding: Math.max(0, totalFees - amountPaid),
-        cleared: amountPaid >= totalFees,
-      };
-    }).filter((r) => r.name && r.index);
+  const handleToggleClearance = async (feeId: string) => {
+    try {
+      await apiFetch(`/fees/${feeId}/clearance`, { method: "PUT" });
+      toast({ title: "Clearance toggled" });
+      loadFees();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploading(true);
     try {
-      const rows = await readSheetFile(file);
-      const parsed = parsePaymentRows(rows);
-      if (parsed.length === 0) {
-        toast({ title: "Import failed", description: "Could not parse records. Ensure columns include Name, Index Number, Department, Programme, Total Fees, Amount Paid.", variant: "destructive" });
-        e.target.value = "";
-        return;
+      const formData = new FormData();
+      formData.append("file", file);
+      const parsed = await apiFetch<{ rows: any[] }>("/fees/parse-bulk", {
+        method: "POST",
+        body: formData,
+        headers: {}, // Let browser set Content-Type with boundary
+      });
+      console.log("Parsed data from backend:", parsed);
+      if (parsed.rows.length === 0) {
+        toast({ title: "No records", description: "Could not parse any records", variant: "destructive" });
+      } else {
+        setImportPreview(parsed.rows);
+        setShowImport(false);
+        toast({ title: "File parsed", description: `${parsed.rows.length} fee records ready to import` });
       }
-      setImportPreview(parsed);
-      setShowImport(false);
-      toast({ title: "File parsed", description: `${parsed.length} payment records ready to import` });
-    } catch (err) {
-      toast({ title: "Invalid file", description: (err as Error).message, variant: "destructive" });
+    } catch (err: any) {
+      console.error("Parse error:", err);
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+      e.target.value = "";
     }
-    e.target.value = "";
   };
 
-  const confirmImport = () => {
-    setRecords((prev) => {
-      const existingIndexes = new Set(prev.map((r) => r.index));
-      const newRecords = importPreview.filter((r) => !existingIndexes.has(r.index));
-      const updatedRecords = prev.map((existing) => {
-        const update = importPreview.find((r) => r.index === existing.index);
-        if (!update) return existing;
-        const newPaid = existing.amountPaid + update.amountPaid;
-        return {
-          ...existing,
-          amountPaid: newPaid,
-          outstanding: Math.max(0, existing.totalFees - newPaid),
-          cleared: newPaid >= existing.totalFees,
-        };
+  const confirmImport = async () => {
+    console.log("Sending to backend:", importPreview);
+    console.log("First record:", JSON.stringify(importPreview[0], null, 2));
+    try {
+      const result = await apiFetch<{ created: any[]; errors?: string[] }>("/fees/upload-bulk", {
+        method: "POST",
+        body: JSON.stringify({ fees: importPreview }),
       });
-      return [...updatedRecords, ...newRecords];
-    });
-    toast({ title: "Payments imported", description: `${importPreview.length} records processed and added to the system` });
-    setImportPreview([]);
+      
+      console.log("Backend response:", result);
+      
+      if (result.errors && result.errors.length > 0) {
+        console.error("Import errors:", result.errors);
+        toast({ 
+          title: "Import completed with errors", 
+          description: `${result.created.length} records imported, ${result.errors.length} errors. Check console for details.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({ 
+          title: "Import complete", 
+          description: `${result.created.length} records imported successfully` 
+        });
+      }
+      
+      setImportPreview([]);
+      loadFees();
+    } catch (err: any) {
+      console.error("Import failed:", err);
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    }
   };
 
   const filtered = records.filter((f) => {
-    const matchesSearch = f.name.toLowerCase().includes(search.toLowerCase()) || f.index.includes(search);
-    const matchesStatus = statusFilter === "all" || (statusFilter === "cleared" ? f.cleared : !f.cleared);
+    const fullName = `${f.first_name} ${f.last_name}`;
+    const matchesSearch = fullName.toLowerCase().includes(search.toLowerCase()) || f.index_number.includes(search);
+    const matchesStatus = statusFilter === "all" || (statusFilter === "cleared" ? f.is_cleared : !f.is_cleared);
     const effectiveDept = isSuperAdmin ? deptFilter : (adminDepartment || "all");
-    const matchesDept = effectiveDept === "all" || f.department === effectiveDept;
-    const matchesProg = progFilter === "all" || f.program === progFilter;
+    const matchesDept = effectiveDept === "all" || f.department_name === effectiveDept;
+    const matchesProg = progFilter === "all" || f.program_name === progFilter;
     return matchesSearch && matchesStatus && matchesDept && matchesProg;
   });
 
-  const allDepts = [...new Set(records.map((f) => f.department))];
-  const allProgs = [...new Set(records.map((f) => f.program))];
-  const deptRecords = adminDepartment ? records.filter((f) => f.department === adminDepartment) : records;
-  const totalCleared = deptRecords.filter((f) => f.cleared).length;
-  const totalOwing = deptRecords.filter((f) => !f.cleared).length;
+  const allDepts = [...new Set(records.map((f) => f.department_name).filter(Boolean))];
+  const allProgs = [...new Set(records.map((f) => f.program_name).filter(Boolean))];
+  const deptRecords = adminDepartment ? records.filter((f) => f.department_name === adminDepartment) : records;
+  const totalCleared = deptRecords.filter((f) => f.is_cleared).length;
+  const totalOwing = deptRecords.filter((f) => !f.is_cleared).length;
   const totalOutstanding = deptRecords.reduce((s, f) => s + f.outstanding, 0);
 
   return (
@@ -170,13 +169,13 @@ const FeesStatus = () => {
             <h3 className="font-display text-lg font-bold text-foreground mb-2">Import Manual Payments</h3>
             <p className="text-sm text-muted-foreground mb-4">Upload a CSV or Excel file containing the list of students who made payments manually at their respective departments. The system will read the file and add payments to the history by department.</p>
             <p className="text-xs text-muted-foreground mb-3">Expected columns: Student Name, Index Number, Department, Programme, Total Fees, Amount Paid</p>
-            <input ref={fileRef} type="file" accept={SHEET_ACCEPT} className="hidden" onChange={handleImportFile} />
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleImportFile} disabled={uploading} />
             <div
               onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary/50 transition-colors"
             >
               <Upload size={28} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-foreground font-medium">Click to upload CSV or Excel file</p>
+              <p className="text-sm text-foreground font-medium">{uploading ? "Uploading..." : "Click to upload CSV or Excel file"}</p>
               <p className="text-xs text-muted-foreground mt-1">Accepted: .csv, .xlsx, .xls</p>
             </div>
             <button onClick={() => setShowImport(false)} className="w-full mt-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
@@ -198,21 +197,19 @@ const FeesStatus = () => {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-card">
                 <tr className="border-b border-border">
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Name</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Index</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Department</th>
-                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Programme</th>
-                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Paid (GHS)</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Index Number</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Amount (GHS)</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Year</th>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Semester</th>
                 </tr>
               </thead>
               <tbody>
                 {importPreview.map((r, i) => (
                   <tr key={i} className="border-b border-border last:border-0">
-                    <td className="px-3 py-2 text-foreground">{r.name}</td>
-                    <td className="px-3 py-2 font-mono text-muted-foreground">{r.index}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.department}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{r.program}</td>
-                    <td className="px-3 py-2 text-right text-foreground">{r.amountPaid.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-foreground">{r.index_number}</td>
+                    <td className="px-3 py-2 text-foreground">{r.total_amount}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.academic_year || "N/A"}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{r.semester || "N/A"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -320,13 +317,13 @@ const FeesStatus = () => {
             </thead>
             <tbody>
               {filtered.map((f) => (
-                <tr key={f.index} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-foreground">{f.name}</td>
-                  <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{f.index}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{f.program}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{f.department}</td>
-                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.totalFees.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.amountPaid.toLocaleString()}</td>
+                <tr key={f.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                  <td className="px-6 py-4 text-sm font-medium text-foreground">{f.first_name} {f.last_name}</td>
+                  <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{f.index_number}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{f.program_name}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{f.department_name}</td>
+                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.total_amount.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-right text-muted-foreground">GHS {f.amount_paid.toLocaleString()}</td>
                   <td className="px-6 py-4 text-sm text-right font-semibold text-foreground">
                     {f.outstanding > 0 ? (
                       <span className="text-destructive">GHS {f.outstanding.toLocaleString()}</span>
@@ -335,13 +332,13 @@ const FeesStatus = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${f.cleared ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
-                      {f.cleared ? "Cleared" : "Owing"}
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${f.is_cleared ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>
+                      {f.is_cleared ? "Cleared" : "Owing"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleToggleClearance(f.index)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${f.cleared ? "border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "gradient-gold text-secondary-foreground hover:opacity-90"}`}>
-                      {f.cleared ? "Revoke" : "Clear"}
+                    <button onClick={() => handleToggleClearance(f.id)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${f.is_cleared ? "border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "gradient-gold text-secondary-foreground hover:opacity-90"}`}>
+                      {f.is_cleared ? "Revoke" : "Clear"}
                     </button>
                   </td>
                 </tr>

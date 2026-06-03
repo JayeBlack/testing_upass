@@ -2,6 +2,19 @@ const db = require("../db");
 const bcrypt = require("bcryptjs");
 const XLSX = require("xlsx");
 
+// Helper function to generate program code from name
+function generateProgramCode(name) {
+  // Convert to uppercase, remove special chars, keep only alphanumeric
+  let code = name.toUpperCase().replace(/[^A-Z0-9\s]/g, "").trim();
+  // Take first letters of each word or first 10 chars
+  if (code.includes(" ")) {
+    code = code.split(" ").map(w => w[0]).join("").substring(0, 10);
+  } else {
+    code = code.substring(0, 10);
+  }
+  return code || "PROG";
+}
+
 // GET /api/students
 exports.getAll = async (req, res) => {
   try {
@@ -117,7 +130,8 @@ exports.enroll = async (req, res) => {
       const p = await client.query("SELECT id FROM programs WHERE LOWER(name) = LOWER($1)", [program]);
       if (p.rows.length > 0) programId = p.rows[0].id;
       else {
-        const np = await client.query("INSERT INTO programs (name, is_active) VALUES ($1, TRUE) RETURNING id", [program]);
+        const programCode = generateProgramCode(program);
+        const np = await client.query("INSERT INTO programs (name, code, is_active) VALUES ($1, $2, TRUE) RETURNING id", [program, programCode]);
         programId = np.rows[0].id;
       }
     }
@@ -325,7 +339,8 @@ exports.enrollBulk = async (req, res) => {
           const p = await client.query("SELECT id FROM programs WHERE LOWER(name) = LOWER($1)", [program]);
           if (p.rows.length > 0) programId = p.rows[0].id;
           else {
-            const np = await client.query("INSERT INTO programs (name, is_active) VALUES ($1, TRUE) RETURNING id", [program]);
+            const programCode = generateProgramCode(program);
+            const np = await client.query("INSERT INTO programs (name, code, is_active) VALUES ($1, $2, TRUE) RETURNING id", [program, programCode]);
             programId = np.rows[0].id;
           }
         }

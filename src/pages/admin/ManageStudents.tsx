@@ -1,169 +1,143 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Users, Search, Trash2, X, Upload, KeyRound } from "lucide-react";
-import { useState, useRef } from "react";
+import { Search, Trash2, X, Upload, KeyRound, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { useAdminDepartment } from "@/hooks/use-admin-department";
-import { useDataStore, type Student } from "@/contexts/DataStoreContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, ApiError } from "@/lib/api";
 
+interface Student {
+  id: string;
+  name: string;
+  first_name: string;
+  last_name: string;
+  index_number: string;
+  email: string;
+  program_name: string;
+  department_name: string;
+  status: string;
+}
+
 const ManageStudents = () => {
-  const { students, addStudent, addStudents, removeStudent } = useDataStore();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
   const [showEnrollForm, setShowEnrollForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [deptFilter, setDeptFilter] = useState("all");
-  const fileRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  const { isSuperAdmin, adminDepartment } = useAdminDepartment();
-  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", index: "", email: "", program: "", department: "" });
 
-  const departments = [...new Set(students.map((s) => s.department))];
-
-  const [form, setForm] = useState({
-    name: "", index: "", email: "", program: "", department: "", status: "Active" as "Active" | "Inactive",
-  });
-
-  const filtered = students.filter((s) => {
-    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) || s.index.includes(search);
-    const effectiveDept = isSuperAdmin ? deptFilter : (adminDepartment || "all");
-    const matchesDept = effectiveDept === "all" || s.department === effectiveDept;
-    return matchesSearch && matchesDept;
-  });
-
-  const handleEnroll = async () => {
-    if (!form.name.trim() || !form.index.trim() || !form.email.trim() || !form.program.trim() || !form.department.trim()) {
-      toast({ title: "Missing fields", description: "Please fill in all required fields", variant: "destructive" });
-      return;
-    }
+  const load = async () => {
+    setLoading(true);
     try {
-      const payload = {
-        name: form.name.trim(),
-        email: form.email.trim(),
-        index: form.index.trim(),
-        program: form.program,
-        department: form.department,
-        admission_year: new Date().getFullYear(),
-      };
-      const res = await apiFetch<{ student: any; default_password?: string }>("/students/enroll", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-      const s = res.student;
-      const created: Student = {
-        id: String(s.id),
-        name: `${s.first_name || form.name.split(" ")[0]} ${s.last_name || form.name.split(" ").slice(1).join(" ")}`.trim(),
-        index: s.index_number || form.index,
-        email: s.email || form.email,
-        program: s.program_name || form.program,
-        department: s.department_name || form.department,
-        status: s.status || "Active",
-      };
-      addStudent(created);
-      setForm({ name: "", index: "", email: "", program: "", department: "", status: "Active" });
-      setShowEnrollForm(false);
-      toast({ title: "Student enrolled", description: `${created.name} has been added to the system` });
-    } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Could not enroll student";
-      toast({ title: "Failed", description: msg, variant: "destructive" });
+      const data = await apiFetch<Student[]>("/students");
+      setStudents(data || []);
+    } catch {
+      // backend offline
+    } finally {
+      setLoading(false);
     }
   };
 
-  const normalizeHeader = (h: string) => h.toLowerCase().replace(/[^a-z]/g, "");
+  useEffect(() => { load(); }, []);
+
+  const departments = [...new Set(students.map((s) => s.department_name).filter(Boolean))];
+
+  const filtered = students.filter((s) => {
+    const name = `${s.first_name || ""} ${s.last_name || ""}`.trim().toLowerCase();
+    const matchSearch = name.includes(search.toLowerCase()) || s.index_number.includes(search);
+    const matchDept = deptFilter === "all" || s.department_name === deptFilter;
+    return matchSearch && matchDept;
+  });
+
+  const handleEnroll = async () => {
+    if (!form.name || !form.index || !form.email || !form.program || !form.department) {
+      toast({ title: "Missing fields", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiFetch("/students/enroll", {
+        method: "POST",
+        body: JSON.stringify({ 
+          name: form.name, 
+          email: form.email, 
+          index: form.index, 
+          program: form.program, 
+          department: form.department, 
+          admission_year: new Date().getFullYear() 
+        }),
+      });
+      toast({ title: "Student enrolled", description: form.name });
+      setForm({ name: "", index: "", email: "", program: "", department: "" });
+      setShowEnrollForm(false);
+      load();
+    } catch (err) {
+      toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
-      // Step 1: Parse file on backend
       const formData = new FormData();
       formData.append("file", file);
-
-      const parseRes = await apiFetch<{ rows: Array<{ name: string; index: string; email: string; program: string; department: string }> }>(
-        "/students/parse-bulk",
-        {
-          method: "POST",
-          body: formData,
-          headers: {},
-        }
-      );
-
-      if (!parseRes.rows || parseRes.rows.length === 0) {
-        toast({ title: "No valid students found", description: "Ensure columns: Name, Index Number, Email, Programme, Department", variant: "destructive" });
+      const parseRes = await apiFetch<{ rows: any[] }>("/students/parse-bulk", { method: "POST", body: formData, headers: {} });
+      if (!parseRes.rows?.length) { 
+        toast({ title: "No valid rows found", variant: "destructive" }); 
         e.target.value = "";
-        return;
+        return; 
       }
-
-      // Step 2: Enroll all students
-      const enrollRes = await apiFetch<{ enrolled: any[]; errors?: string[] }>(
-        "/students/enroll-bulk",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            students: parseRes.rows.map((row) => ({
-              name: row.name,
-              email: row.email,
-              index: row.index,
-              program: row.program,
-              department: row.department || adminDepartment,
-              admission_year: new Date().getFullYear(),
-            })),
-          }),
-        }
-      );
-
-      if (enrollRes.enrolled && enrollRes.enrolled.length > 0) {
-        const newStudents: Student[] = enrollRes.enrolled.map((s: any) => ({
-          id: String(s.id),
-          name: `${s.first_name || ""} ${s.last_name || ""}`.trim(),
-          index: s.index_number || "",
-          email: s.email || "",
-          program: s.program_name || "",
-          department: s.department_name || "",
-          status: s.status || "Active",
-        }));
-
-        addStudents(newStudents);
-
-        const msg =
-          enrollRes.errors && enrollRes.errors.length > 0
-            ? `${enrollRes.enrolled.length} enrolled. Issues: ${enrollRes.errors.join("; ")}`
-            : `${enrollRes.enrolled.length} students successfully enrolled`;
-
-        toast({ title: "Bulk enrollment completed", description: msg });
-      } else if (enrollRes.errors?.length) {
-        toast({ title: "No students enrolled", description: enrollRes.errors.join("; "), variant: "destructive" });
-      }
-
+      const enrollRes = await apiFetch<{ enrolled: any[]; errors?: string[] }>("/students/enroll-bulk", {
+        method: "POST",
+        body: JSON.stringify({ 
+          students: parseRes.rows.map((r) => ({ 
+            ...r, 
+            admission_year: new Date().getFullYear() 
+          })) 
+        }),
+      });
+      const msg = enrollRes.errors?.length 
+        ? `${enrollRes.enrolled.length} enrolled. ${enrollRes.errors.length} errors.`
+        : `${enrollRes.enrolled.length} students enrolled`;
+      toast({ title: "Bulk enrollment completed", description: msg });
       setShowBulkUpload(false);
+      load();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Could not process bulk upload";
-      toast({ title: "Failed", description: msg, variant: "destructive" });
+      toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
     }
     e.target.value = "";
   };
 
-  const handleDelete = (id: string) => {
-    const student = students.find((s) => s.id === id);
-    removeStudent(id);
-    setDeleteConfirm(null);
-    toast({ title: "Student removed", description: `${student?.name} has been removed from the system` });
+  const handleDelete = async (id: string) => {
+    try {
+      await apiFetch(`/students/${id}`, { method: "DELETE" });
+      setStudents((prev) => prev.filter((s) => s.id !== id));
+      setDeleteConfirm(null);
+      toast({ title: "Student removed" });
+    } catch (err) {
+      toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
+    }
   };
 
   const handleResetPassword = async (s: Student) => {
-    if (!confirm(`Reset ${s.name}'s password to their index number (${s.index})?`)) return;
+    if (!confirm(`Reset ${s.first_name} ${s.last_name}'s password to their index number?`)) return;
     try {
-      const res = await apiFetch<{ default_password: string }>("/auth/admin/reset-password", {
-        method: "POST",
-        body: JSON.stringify({ user_id: Number(s.id) }),
+      const res = await apiFetch<{ default_password: string }>("/auth/admin/reset-password", { 
+        method: "POST", 
+        body: JSON.stringify({ user_id: Number(s.id) }) 
       });
       toast({ title: "Password reset", description: `New password: ${res.default_password}` });
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : "Could not reset password";
-      toast({ title: "Failed", description: msg, variant: "destructive" });
+      toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
     }
   };
 
@@ -172,9 +146,7 @@ const ManageStudents = () => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">Manage Students</h1>
-          <p className="text-muted-foreground mt-1">
-            {isSuperAdmin ? `${students.length} registered postgraduate students` : `${adminDepartment} — ${filtered.length} students`}
-          </p>
+          <p className="text-muted-foreground mt-1">{loading ? "Loading..." : `${students.length} registered postgraduate students`}</p>
         </div>
         <div className="flex gap-3">
           <button onClick={() => setShowBulkUpload(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
@@ -191,7 +163,7 @@ const ManageStudents = () => {
           <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display text-lg font-bold text-foreground">Bulk Student Upload</h3>
-              <button onClick={() => setShowBulkUpload(false)} className="p-1 rounded hover:bg-muted transition-colors"><X size={18} className="text-muted-foreground" /></button>
+              <button onClick={() => setShowBulkUpload(false)} className="p-1 rounded hover:bg-muted"><X size={18} className="text-muted-foreground" /></button>
             </div>
             <p className="text-sm text-muted-foreground mb-3">Upload an Excel or CSV file containing student details.</p>
             <p className="text-xs text-muted-foreground mb-4 bg-muted p-3 rounded-lg">Expected columns: Name, Index Number, Email, Programme, Department</p>
@@ -199,9 +171,8 @@ const ManageStudents = () => {
             <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-secondary/50 transition-colors">
               <Upload size={28} className="mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-foreground font-medium">Click to upload file</p>
-              <p className="text-xs text-muted-foreground mt-1">CSV or Excel file (max 10MB)</p>
+              <p className="text-xs text-muted-foreground mt-1">CSV or Excel (max 10MB)</p>
             </div>
-            <button onClick={() => setShowBulkUpload(false)} className="w-full mt-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
           </div>
         </div>
       )}
@@ -211,7 +182,7 @@ const ManageStudents = () => {
           <div className="bg-card rounded-2xl border border-border p-6 max-w-lg w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-display text-lg font-bold text-foreground">Enroll New Student</h3>
-              <button onClick={() => setShowEnrollForm(false)} className="p-1 rounded hover:bg-muted transition-colors"><X size={18} className="text-muted-foreground" /></button>
+              <button onClick={() => setShowEnrollForm(false)} className="p-1 rounded hover:bg-muted"><X size={18} className="text-muted-foreground" /></button>
             </div>
             <div className="space-y-4">
               <div>
@@ -221,7 +192,7 @@ const ManageStudents = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Index Number *</label>
-                  <input value={form.index} onChange={(e) => setForm({ ...form, index: e.target.value })} className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" placeholder="e.g. UMaT/PG/0234/22" />
+                  <input value={form.index} onChange={(e) => setForm({ ...form, index: e.target.value })} className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" placeholder="UMaT/PG/0234/22" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Email *</label>
@@ -233,25 +204,28 @@ const ManageStudents = () => {
                   <label className="text-xs font-medium text-muted-foreground">Programme *</label>
                   <select value={form.program} onChange={(e) => setForm({ ...form, program: e.target.value })} className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none">
                     <option value="">Select programme</option>
-                    <option value="MSc. IT">MSc. Information Technology</option>
-                    <option value="MPhil CS">MPhil Computer Science</option>
-                    <option value="MSc. Mining Eng">MSc. Mining Engineering</option>
-                    <option value="MSc. Electrical Eng">MSc. Electrical Engineering</option>
-                    <option value="MSc. Mechanical Eng">MSc. Mechanical Engineering</option>
+                    <option>MSc. Information Technology</option>
+                    <option>MPhil Computer Science</option>
+                    <option>MSc. Mining Engineering</option>
+                    <option>MSc. Electrical Engineering</option>
+                    <option>MSc. Mechanical Engineering</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Department *</label>
                   <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none">
                     <option value="">Select department</option>
-                    <option value="Computer Science">Computer Science</option>
-                    <option value="Mining Engineering">Mining Engineering</option>
-                    <option value="Electrical Engineering">Electrical Engineering</option>
-                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option>Computer Science</option>
+                    <option>Mining Engineering</option>
+                    <option>Electrical Engineering</option>
+                    <option>Mechanical Engineering</option>
                   </select>
                 </div>
               </div>
-              <Button onClick={handleEnroll} className="w-full gradient-gold text-secondary-foreground hover:opacity-90">Enroll Student</Button>
+              <Button onClick={handleEnroll} disabled={saving} className="w-full gradient-gold text-secondary-foreground hover:opacity-90">
+                {saving ? <Loader2 size={14} className="animate-spin mr-1.5" /> : null}
+                Enroll Student
+              </Button>
             </div>
           </div>
         </div>
@@ -260,11 +234,11 @@ const ManageStudents = () => {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setDeleteConfirm(null)}>
           <div className="bg-card rounded-2xl border border-border p-6 max-w-sm w-full shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={24} className="text-destructive" />
-            </div>
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4"><Trash2 size={24} className="text-destructive" /></div>
             <h3 className="font-display text-lg font-bold text-foreground mb-2">Delete Student</h3>
-            <p className="text-sm text-muted-foreground mb-5">Are you sure you want to remove <strong>{students.find((s) => s.id === deleteConfirm)?.name}</strong>? This cannot be undone.</p>
+            <p className="text-sm text-muted-foreground mb-5">
+              Remove <strong>{students.find((s) => s.id === deleteConfirm)?.first_name} {students.find((s) => s.id === deleteConfirm)?.last_name}</strong>? This cannot be undone.
+            </p>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
               <Button variant="destructive" className="flex-1" onClick={() => handleDelete(deleteConfirm)}>Delete</Button>
@@ -276,62 +250,52 @@ const ManageStudents = () => {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or index number..." className="w-full pl-11 pr-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or index number..." className="w-full pl-11 pr-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
-        {isSuperAdmin && (
-          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-            <option value="all">All Departments</option>
-            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-        )}
+        <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">All Departments</option>
+          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
       </div>
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Index</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Programme</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Department</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => (
-                <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-foreground">{s.name}</td>
-                  <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{s.index}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{s.program}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{s.department}</td>
-                  <td className="px-6 py-4">
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.status === "Active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{s.status}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="inline-flex items-center gap-1 justify-end">
-                      {user?.isSuperAdmin && (
-                        <button
-                          onClick={() => handleResetPassword(s)}
-                          className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                          title="Reset password to index number"
-                        >
-                          <KeyRound size={16} />
-                        </button>
-                      )}
-                      <button onClick={() => setDeleteConfirm(s.id)} className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Delete student">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm"><Loader2 size={18} className="animate-spin mr-2" /> Loading students...</div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Name</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Index</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Programme</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Department</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="text-right px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No students found</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((s) => (
+                  <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-foreground">{s.first_name} {s.last_name}</td>
+                    <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{s.index_number}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{s.program_name}</td>
+                    <td className="px-6 py-4 text-sm text-muted-foreground">{s.department_name}</td>
+                    <td className="px-6 py-4"><span className={`text-xs font-medium px-2.5 py-1 rounded-full ${s.status === "Active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{s.status}</span></td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="inline-flex items-center gap-1 justify-end">
+                        {user?.isSuperAdmin && (
+                          <button onClick={() => handleResetPassword(s)} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Reset password"><KeyRound size={16} /></button>
+                        )}
+                        <button onClick={() => setDeleteConfirm(s.id)} className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && !loading && <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">No students found</td></tr>}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </DashboardLayout>

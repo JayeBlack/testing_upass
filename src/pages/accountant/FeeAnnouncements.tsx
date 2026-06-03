@@ -20,11 +20,7 @@ interface FeeListItem {
   amount: string;
 }
 
-const mockAnnouncements: Announcement[] = [
-  { id: "a1", title: "Fee Payment Deadline Reminder", message: "All postgraduate students are reminded that the deadline for Semester 2 fee payment is 30th April 2026. Students with outstanding fees will not be eligible for examination.", audience: "All Students", sentAt: "2026-04-01 10:00", recipients: 247 },
-  { id: "a2", title: "Outstanding Fees Notice", message: "This is to notify students with outstanding fee balances to settle their fees immediately to avoid clearance delays.", audience: "Students with Outstanding Fees", sentAt: "2026-03-25 14:30", recipients: 44 },
-  { id: "a3", title: "Payment Methods Update", message: "Students can now make payments via MTN Mobile Money, Vodafone Cash, AirtelTigo Money, or bank transfer. Visit the Finance Office for assistance.", audience: "All Students", sentAt: "2026-03-15 09:00", recipients: 247 },
-];
+const mockAnnouncements: Announcement[] = [];
 
 const FeeAnnouncements = () => {
   const { students, graduands } = useDataStore();

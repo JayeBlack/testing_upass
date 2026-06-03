@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
+const userRoutes = require("./routes/userRoutes");
 const authRoutes = require("./routes/authRoutes");
 const studentRoutes = require("./routes/studentRoutes");
 const supervisorRoutes = require("./routes/supervisorRoutes");
@@ -45,6 +46,7 @@ app.use("/uploads", express.static(process.env.UPLOAD_DIR || "./uploads"));
 
 // ── Routes ──
 app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/supervisors", supervisorRoutes);
 app.use("/api/courses", courseRoutes);

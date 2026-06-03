@@ -73,45 +73,45 @@ const Dashboard = () => {
   const feesClearedPct = totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0;
 
   const studentStats = [
-    { icon: <BookOpen size={18} className="text-secondary-foreground" />, label: "Registered Courses", value: "6", accent: true, trend: "neutral" as const, sub: "Semester 1" },
-    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Thesis Progress", value: "Ch. 3", trend: "up" as const, sub: "On track" },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "CWA", value: "72.4", trend: "up" as const, sub: "+2.1" },
-    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "2" },
+    { icon: <BookOpen size={18} className="text-secondary-foreground" />, label: "Registered Courses", value: "—", accent: true },
+    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Thesis Progress", value: "—" },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "CWA", value: "—" },
+    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "—" },
   ];
 
   const supervisorStats = [
-    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Assigned Students", value: "8", accent: true, trend: "up" as const, sub: "+2" },
-    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "5", trend: "down" as const, sub: "-3" },
-    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Approved This Month", value: "12", trend: "up" as const, sub: "+4" },
-    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Avg Review Time", value: "3d" },
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Assigned Students", value: "—", accent: true },
+    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "—" },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Approved This Month", value: "—" },
+    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Avg Review Time", value: "—" },
   ];
 
   const adminStats = [
-    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, trend: "up" as const, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
-    { icon: <BookOpen size={18} className="text-muted-foreground" />, label: "Active Courses", value: adminDepartment ? "8" : "34" },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Fees Cleared", value: `${feesClearedPct}%`, trend: "up" as const, sub: "+5%", onClick: () => navigate("/admin/fees") },
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
+    { icon: <BookOpen size={18} className="text-muted-foreground" />, label: "Active Courses", value: "—" },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Fees Cleared", value: `${feesClearedPct}%`, onClick: () => navigate("/admin/fees") },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
   ];
 
   const deanStats = [
-    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, trend: "up" as const, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
-    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Clearances Pending", value: "14", trend: "down" as const, sub: "-6", onClick: () => navigate("/dean/clearance") },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Avg CWA", value: deptGraduands.length > 0 ? (deptGraduands.reduce((a, g) => a + g.cwa, 0) / deptGraduands.length).toFixed(1) : "—", trend: "up" as const, sub: "+1.2" },
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Clearances Pending", value: "—", onClick: () => navigate("/dean/clearance") },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Avg CWA", value: deptGraduands.length > 0 ? (deptGraduands.reduce((a, g) => a + g.cwa, 0) / deptGraduands.length).toFixed(1) : "—" },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
   ];
 
   const accountantStats = [
-    { icon: <Banknote size={18} className="text-secondary-foreground" />, label: "Total Fees Collected", value: "GH₵ 1.2M", accent: true, trend: "up" as const, sub: "+18%", onClick: () => navigate("/accountant/analytics") },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: "82%", trend: "up" as const, sub: "+5%" },
-    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: String(totalStudents - activeStudents), trend: "down" as const, sub: "-8", onClick: () => navigate("/admin/fees") },
-    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Receipts", value: "8" },
+    { icon: <Banknote size={18} className="text-secondary-foreground" />, label: "Total Fees Collected", value: "—", accent: true, onClick: () => navigate("/accountant/analytics") },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: "—" },
+    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: "—", onClick: () => navigate("/admin/fees") },
+    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Receipts", value: "—" },
   ];
 
   const examsOfficerStats = [
-    { icon: <BarChart3 size={18} className="text-secondary-foreground" />, label: "Results Published", value: "3", accent: true },
-    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Batches", value: "5", trend: "down" as const, sub: "-2" },
+    { icon: <BarChart3 size={18} className="text-secondary-foreground" />, label: "Results Published", value: "—", accent: true },
+    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Batches", value: "—" },
     { icon: <Users size={18} className="text-muted-foreground" />, label: "Total Students", value: String(totalStudents) },
-    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "86%", trend: "up" as const, sub: "+3%" },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "—" },
   ];
 
   const roleStatsMap: Record<string, StatItem[]> = {
@@ -171,42 +171,12 @@ const Dashboard = () => {
   };
 
   const roleActivities: Record<string, { text: string; time: string }[]> = {
-    Student: [
-      { text: "Thesis Chapter 2 submitted for review", time: "2 hours ago" },
-      { text: "Course registration approved by advisor", time: "1 day ago" },
-      { text: "Fees payment confirmed — GH₵ 2,600 received", time: "3 days ago" },
-      { text: "Library clearance approved", time: "5 days ago" },
-    ],
-    Supervisor: [
-      { text: "Kwame Mensah submitted Chapter 3 for review", time: "1 hour ago" },
-      { text: "Esi Appiah's thesis proposal approved", time: "1 day ago" },
-      { text: "New student Yaw Boateng assigned to you", time: "2 days ago" },
-      { text: "Remark added for Efua Dankwah's Chapter 2", time: "4 days ago" },
-    ],
-    Admin: [
-      { text: "12 new student registrations processed", time: "3 hours ago" },
-      { text: "Pass list for Semester 1 generated", time: "1 day ago" },
-      { text: "Fee records updated for Mining Engineering", time: "2 days ago" },
-      { text: "Exam timetable published for all programs", time: "3 days ago" },
-    ],
-    Dean: [
-      { text: "5 new clearance requests awaiting approval", time: "1 hour ago" },
-      { text: "CWA results reviewed for Computer Science", time: "1 day ago" },
-      { text: "Graduation list finalized — 56 students", time: "2 days ago" },
-      { text: "Clearance approved for Akua Sarpong", time: "3 days ago" },
-    ],
-    Accountant: [
-      { text: "GH₵ 15,400 in fee payments received today", time: "2 hours ago" },
-      { text: "Monthly financial report exported", time: "1 day ago" },
-      { text: "3 students flagged for outstanding fees", time: "2 days ago" },
-      { text: "Fee compliance rate updated to 82%", time: "4 days ago" },
-    ],
-    ExamsOfficer: [
-      { text: "Semester 1 results published for MSc. IT", time: "1 hour ago" },
-      { text: "CSV grade upload for Mining Engineering processed", time: "1 day ago" },
-      { text: "Pass list generated for Computer Science", time: "2 days ago" },
-      { text: "CWA recalculated for 28 students", time: "3 days ago" },
-    ],
+    Student: [],
+    Supervisor: [],
+    Admin: [],
+    Dean: [],
+    Accountant: [],
+    ExamsOfficer: [],
   };
 
   const recentActivity = roleActivities[user?.role || "Student"] ?? roleActivities.Admin;
@@ -264,7 +234,10 @@ const Dashboard = () => {
             </span>
           </div>
           <div className="space-y-1">
-            {recentActivity.map((a, i) => (
+            {recentActivity.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">No recent activity</div>
+            ) : (
+              recentActivity.map((a, i) => (
               <div key={i} className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors">
                 <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-0.5 shrink-0">
                   <Activity size={14} className="text-muted-foreground" />
@@ -274,7 +247,8 @@ const Dashboard = () => {
                   <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">{a.time}</p>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
 

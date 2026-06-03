@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,158 +10,176 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Upload, FileText, FileType, Archive, Download, Trash2, Filter,
-  Send, Paperclip, Calendar, Bell, Clock, Users, User, Eye, X,
-  Plus, Search, SortAsc,
+  Send, Paperclip, Calendar, Bell, Clock, Users, User, X,
+  Plus, Search, SortAsc, Loader2,
 } from "lucide-react";
 
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
 interface Resource {
   id: string;
   name: string;
-  type: string;
-  size: string;
   category: string;
-  description: string;
-  uploadDate: string;
-  file?: File;
+  description: string | null;
+  file_path: string;
+  file_size: number | null;
+  uploaded_at: string;
 }
 
 interface Announcement {
   id: string;
   text: string;
   visibility: string;
-  attachmentName?: string;
-  scheduledAt?: string;
-  createdAt: string;
-  acknowledged: number;
-  total: number;
+  scheduled_at: string | null;
+  created_at: string;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Seed data                                                          */
-/* ------------------------------------------------------------------ */
-const seedResources: Resource[] = [
-  { id: "r1", name: "Thesis_Report_Template.docx", type: "DOCX", size: "245 KB", category: "Report Template", description: "Standard thesis report template for MSc students", uploadDate: "2026-02-15" },
-  { id: "r2", name: "Research_Guidelines_2026.pdf", type: "PDF", size: "1.2 MB", category: "Guidelines", description: "Updated research methodology guidelines", uploadDate: "2026-02-20" },
-  { id: "r3", name: "Grading_Rubric.pdf", type: "PDF", size: "180 KB", category: "Rubric", description: "Thesis evaluation rubric for supervisors and examiners", uploadDate: "2026-01-10" },
-  { id: "r4", name: "Presentation_Template.pptx", type: "PPTX", size: "3.8 MB", category: "Report Template", description: "Thesis defence presentation template", uploadDate: "2026-03-01" },
-];
-
-const seedAnnouncements: Announcement[] = [
-  { id: "a1", text: "All thesis chapters must be submitted by March 31, 2026. Late submissions will not be reviewed this semester.", visibility: "All Students", createdAt: "2026-03-05T14:30:00", acknowledged: 5, total: 8 },
-  { id: "a2", text: "Grading rubric has been updated — please review the new criteria before your next submission.", visibility: "All Students", attachmentName: "Grading_Rubric.pdf", createdAt: "2026-03-03T09:15:00", acknowledged: 7, total: 8 },
-  { id: "a3", text: "Kwame, please revise Chapter 2 literature review before our next meeting on Wednesday.", visibility: "Kwame Mensah", createdAt: "2026-03-01T11:00:00", acknowledged: 1, total: 1 },
-];
-
 const categories = ["Report Template", "Guidelines", "Rubric", "Reference Material", "Other"];
-const assignedStudents = ["Kwame Mensah", "Esi Appiah", "Yaw Boateng", "Efua Dankwah", "Kofi Adu", "Akua Sarpong", "Nana Yeboah", "Ama Tetteh"];
 
-const fileIcon = (type: string) => {
-  switch (type) {
-    case "PDF": return <FileText size={18} className="text-destructive" />;
-    case "PPTX": return <FileType size={18} className="text-accent-foreground" />;
-    case "ZIP": return <Archive size={18} className="text-muted-foreground" />;
-    default: return <FileText size={18} className="text-primary" />;
-  }
+const fileIcon = (name: string) => {
+  const ext = name.split(".").pop()?.toUpperCase();
+  if (ext === "PDF") return <FileText size={18} className="text-destructive" />;
+  if (ext === "PPTX") return <FileType size={18} className="text-accent-foreground" />;
+  if (ext === "ZIP") return <Archive size={18} className="text-muted-foreground" />;
+  return <FileText size={18} className="text-primary" />;
 };
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
 const TemplatesAnnouncements = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  /* Resources state */
-  const [resources, setResources] = useState<Resource[]>(seedResources);
+  /* ── Resources ── */
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resLoading, setResLoading] = useState(true);
   const [resFilter, setResFilter] = useState("all");
   const [resSearch, setResSearch] = useState("");
   const [resSort, setResSort] = useState<"date" | "name">("date");
-
-  /* Upload form */
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadDesc, setUploadDesc] = useState("");
   const [uploadCat, setUploadCat] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  /* Announcements state */
-  const [announcements, setAnnouncements] = useState<Announcement[]>(seedAnnouncements);
+  /* ── Announcements ── */
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annLoading, setAnnLoading] = useState(true);
   const [annText, setAnnText] = useState("");
-  const [annVisibility, setAnnVisibility] = useState("all");
-  const [annAttachment, setAnnAttachment] = useState<File | null>(null);
+  const [annVisibility, setAnnVisibility] = useState("All Students");
   const [annSchedule, setAnnSchedule] = useState("");
+  const [annPosting, setAnnPosting] = useState(false);
   const annFileRef = useRef<HTMLInputElement>(null);
+  const [annAttachment, setAnnAttachment] = useState<File | null>(null);
 
-  /* ---- Resource helpers ---- */
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) setUploadFile(f);
+  const loadResources = async () => {
+    setResLoading(true);
+    const { data } = await supabase
+      .from("supervisor_resources")
+      .select("*")
+      .eq("supervisor_id", user?.id)
+      .order("uploaded_at", { ascending: false });
+    setResources((data as Resource[]) || []);
+    setResLoading(false);
   };
 
-  const handleUpload = () => {
+  const loadAnnouncements = async () => {
+    setAnnLoading(true);
+    const { data } = await supabase
+      .from("supervisor_announcements")
+      .select("*")
+      .eq("supervisor_id", user?.id)
+      .order("created_at", { ascending: false });
+    setAnnouncements((data as Announcement[]) || []);
+    setAnnLoading(false);
+  };
+
+  useEffect(() => {
+    if (user?.id) {
+      loadResources();
+      loadAnnouncements();
+    }
+  }, [user?.id]);
+
+  /* ── Resource handlers ── */
+  const handleUpload = async () => {
     if (!uploadFile) { toast({ title: "No file selected", variant: "destructive" }); return; }
     if (!uploadCat) { toast({ title: "Select a category", variant: "destructive" }); return; }
-    const ext = uploadFile.name.split(".").pop()?.toUpperCase() || "FILE";
-    const newRes: Resource = {
-      id: `r${Date.now()}`,
-      name: uploadFile.name,
-      type: ext,
-      size: `${(uploadFile.size / 1024).toFixed(0)} KB`,
-      category: uploadCat,
-      description: uploadDesc || "No description",
-      uploadDate: new Date().toISOString().split("T")[0],
-      file: uploadFile,
-    };
-    setResources((prev) => [newRes, ...prev]);
-    setUploadFile(null);
-    setUploadDesc("");
-    setUploadCat("");
-    toast({ title: "File uploaded", description: uploadFile.name });
+    setUploading(true);
+    try {
+      const path = `${user?.id}/${Date.now()}-${uploadFile.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("supervisor-resources")
+        .upload(path, uploadFile, { contentType: uploadFile.type });
+      if (upErr) throw upErr;
+
+      const { error: insErr } = await supabase.from("supervisor_resources").insert({
+        supervisor_id: user?.id,
+        name: uploadFile.name,
+        category: uploadCat,
+        description: uploadDesc || null,
+        file_path: path,
+        file_size: uploadFile.size,
+      });
+      if (insErr) throw insErr;
+
+      toast({ title: "File uploaded", description: uploadFile.name });
+      setUploadFile(null);
+      setUploadDesc("");
+      setUploadCat("");
+      loadResources();
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const deleteResource = (id: string) => {
-    setResources((prev) => prev.filter((r) => r.id !== id));
+  const deleteResource = async (r: Resource) => {
+    await supabase.storage.from("supervisor-resources").remove([r.file_path]);
+    await supabase.from("supervisor_resources").delete().eq("id", r.id);
+    setResources((prev) => prev.filter((x) => x.id !== r.id));
     toast({ title: "File removed" });
+  };
+
+  const downloadResource = async (r: Resource) => {
+    const { data } = supabase.storage.from("supervisor-resources").getPublicUrl(r.file_path);
+    window.open(data.publicUrl, "_blank");
   };
 
   const filteredResources = resources
     .filter((r) => resFilter === "all" || r.category === resFilter)
-    .filter((r) => r.name.toLowerCase().includes(resSearch.toLowerCase()) || r.description.toLowerCase().includes(resSearch.toLowerCase()))
-    .sort((a, b) => resSort === "date" ? b.uploadDate.localeCompare(a.uploadDate) : a.name.localeCompare(b.name));
+    .filter((r) => r.name.toLowerCase().includes(resSearch.toLowerCase()) || (r.description ?? "").toLowerCase().includes(resSearch.toLowerCase()))
+    .sort((a, b) => resSort === "date" ? b.uploaded_at.localeCompare(a.uploaded_at) : a.name.localeCompare(b.name));
 
-  /* ---- Announcement helpers ---- */
-  const handlePostAnnouncement = () => {
+  /* ── Announcement handlers ── */
+  const handlePostAnnouncement = async () => {
     if (!annText.trim()) { toast({ title: "Enter announcement text", variant: "destructive" }); return; }
-    const vis = annVisibility === "all" ? "All Students" : annVisibility;
-    const total = annVisibility === "all" ? assignedStudents.length : 1;
-    const newAnn: Announcement = {
-      id: `a${Date.now()}`,
-      text: annText.trim(),
-      visibility: vis,
-      attachmentName: annAttachment?.name,
-      scheduledAt: annSchedule || undefined,
-      createdAt: annSchedule || new Date().toISOString(),
-      acknowledged: 0,
-      total,
-    };
-    setAnnouncements((prev) => [newAnn, ...prev]);
-    setAnnText("");
-    setAnnVisibility("all");
-    setAnnAttachment(null);
-    setAnnSchedule("");
-    toast({
-      title: annSchedule ? "Announcement scheduled" : "Announcement posted",
-      description: annSchedule ? `Scheduled for ${new Date(annSchedule).toLocaleString()}` : "Sent to students",
-    });
+    setAnnPosting(true);
+    try {
+      const { error } = await supabase.from("supervisor_announcements").insert({
+        supervisor_id: user?.id,
+        text: annText.trim(),
+        visibility: annVisibility,
+        scheduled_at: annSchedule || null,
+      });
+      if (error) throw error;
+      toast({ title: annSchedule ? "Announcement scheduled" : "Announcement posted" });
+      setAnnText("");
+      setAnnVisibility("All Students");
+      setAnnSchedule("");
+      setAnnAttachment(null);
+      loadAnnouncements();
+    } catch (err: any) {
+      toast({ title: "Failed to post", description: err.message, variant: "destructive" });
+    } finally {
+      setAnnPosting(false);
+    }
   };
 
-  const deleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = async (id: string) => {
+    await supabase.from("supervisor_announcements").delete().eq("id", id);
     setAnnouncements((prev) => prev.filter((a) => a.id !== id));
     toast({ title: "Announcement deleted" });
   };
@@ -179,21 +197,19 @@ const TemplatesAnnouncements = () => {
           <TabsTrigger value="announcements" className="gap-2"><Bell size={16} /> Announcements</TabsTrigger>
         </TabsList>
 
-        {/* ======================== RESOURCES TAB ======================== */}
+        {/* ── RESOURCES TAB ── */}
         <TabsContent value="resources" className="space-y-6">
-          {/* Upload Section */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Upload Template / Guideline</CardTitle>
               <CardDescription>Share thesis-related documents with your students</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Drop zone */}
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
-                onDrop={handleFileDrop}
+                onDrop={(e) => { e.preventDefault(); setIsDragging(false); const f = e.dataTransfer.files[0]; if (f) setUploadFile(f); }}
                 onClick={() => fileRef.current?.click()}
               >
                 <Upload className="mx-auto mb-3 text-muted-foreground" size={32} />
@@ -204,7 +220,7 @@ const TemplatesAnnouncements = () => {
                   </div>
                 ) : (
                   <>
-                    <p className="text-sm font-medium text-foreground">Drag & drop a file here or click to browse</p>
+                    <p className="text-sm font-medium text-foreground">Drag & drop or click to browse</p>
                     <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, PPTX, ZIP — Max 20 MB</p>
                   </>
                 )}
@@ -213,27 +229,25 @@ const TemplatesAnnouncements = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Category / Tag</Label>
+                  <Label>Category</Label>
                   <Select value={uploadCat} onValueChange={setUploadCat}>
                     <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
+                    <SelectContent>{categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Description (optional)</Label>
-                  <Input placeholder="Brief description of this file" value={uploadDesc} onChange={(e) => setUploadDesc(e.target.value)} />
+                  <Input placeholder="Brief description" value={uploadDesc} onChange={(e) => setUploadDesc(e.target.value)} />
                 </div>
               </div>
 
-              <Button onClick={handleUpload} className="w-full sm:w-auto">
-                <Plus size={16} /> Upload File
+              <Button onClick={handleUpload} disabled={uploading} className="w-full sm:w-auto">
+                {uploading ? <Loader2 size={16} className="animate-spin mr-1" /> : <Plus size={16} />}
+                {uploading ? "Uploading..." : "Upload File"}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Resource Library */}
           <Card>
             <CardHeader>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -257,8 +271,10 @@ const TemplatesAnnouncements = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {filteredResources.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No files match your filters.</p>
+              {resLoading ? (
+                <div className="flex items-center justify-center py-10 text-muted-foreground text-sm"><Loader2 size={16} className="animate-spin mr-2" /> Loading...</div>
+              ) : filteredResources.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No files uploaded yet.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -276,24 +292,20 @@ const TemplatesAnnouncements = () => {
                         <TableRow key={r.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              {fileIcon(r.type)}
+                              {fileIcon(r.name)}
                               <div>
                                 <p className="font-medium text-sm text-foreground">{r.name}</p>
-                                <p className="text-xs text-muted-foreground sm:hidden">{r.category} · {r.uploadDate}</p>
+                                <p className="text-xs text-muted-foreground sm:hidden">{r.category} · {r.uploaded_at.slice(0, 10)}</p>
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell"><Badge variant="secondary">{r.category}</Badge></TableCell>
-                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-[200px] truncate">{r.description}</TableCell>
-                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{r.uploadDate}</TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground max-w-[200px] truncate">{r.description ?? "—"}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{r.uploaded_at.slice(0, 10)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">
-                              <Button variant="ghost" size="icon" title="Download" onClick={() => toast({ title: "Downloading…", description: r.name })}>
-                                <Download size={16} />
-                              </Button>
-                              <Button variant="ghost" size="icon" title="Delete" onClick={() => deleteResource(r.id)} className="text-destructive hover:text-destructive">
-                                <Trash2 size={16} />
-                              </Button>
+                              <Button variant="ghost" size="icon" title="Download" onClick={() => downloadResource(r)}><Download size={16} /></Button>
+                              <Button variant="ghost" size="icon" title="Delete" onClick={() => deleteResource(r)} className="text-destructive hover:text-destructive"><Trash2 size={16} /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -306,38 +318,29 @@ const TemplatesAnnouncements = () => {
           </Card>
         </TabsContent>
 
-        {/* ==================== ANNOUNCEMENTS TAB ====================== */}
+        {/* ── ANNOUNCEMENTS TAB ── */}
         <TabsContent value="announcements" className="space-y-6">
-          {/* Compose */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Post Announcement</CardTitle>
               <CardDescription>Send notices to your assigned students</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Textarea
-                placeholder="Type your announcement here…"
-                rows={4}
-                value={annText}
-                onChange={(e) => setAnnText(e.target.value)}
-              />
+              <Textarea placeholder="Type your announcement here…" rows={4} value={annText} onChange={(e) => setAnnText(e.target.value)} />
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Visibility */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1"><Users size={14} /> Visibility</Label>
                   <Select value={annVisibility} onValueChange={setAnnVisibility}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Assigned Students</SelectItem>
-                      {assignedStudents.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      <SelectItem value="All Students">All Assigned Students</SelectItem>
+                      <SelectItem value="Individual">Individual Student</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Attachment */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1"><Paperclip size={14} /> Attachment</Label>
+                  <Label className="flex items-center gap-1"><Paperclip size={14} /> Attachment (optional)</Label>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="w-full" onClick={() => annFileRef.current?.click()}>
                       {annAttachment ? annAttachment.name : "Attach file"}
@@ -346,33 +349,31 @@ const TemplatesAnnouncements = () => {
                   </div>
                   <input ref={annFileRef} type="file" className="hidden" onChange={(e) => { if (e.target.files?.[0]) setAnnAttachment(e.target.files[0]); }} />
                 </div>
-
-                {/* Schedule */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1"><Calendar size={14} /> Schedule (optional)</Label>
                   <Input type="datetime-local" value={annSchedule} onChange={(e) => setAnnSchedule(e.target.value)} />
                 </div>
               </div>
 
-              <Button onClick={handlePostAnnouncement} className="w-full sm:w-auto">
-                <Send size={16} /> {annSchedule ? "Schedule" : "Post Now"}
+              <Button onClick={handlePostAnnouncement} disabled={annPosting} className="w-full sm:w-auto">
+                {annPosting ? <Loader2 size={16} className="animate-spin mr-1" /> : <Send size={16} />}
+                {annSchedule ? "Schedule" : "Post Now"}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Feed */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Announcement Feed</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Announcement Feed</CardTitle></CardHeader>
             <CardContent>
-              {announcements.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No announcements yet.</p>
+              {annLoading ? (
+                <div className="flex items-center justify-center py-10 text-muted-foreground text-sm"><Loader2 size={16} className="animate-spin mr-2" /> Loading...</div>
+              ) : announcements.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No announcements posted yet.</p>
               ) : (
                 <div className="space-y-4">
                   {announcements.map((a) => {
-                    const date = new Date(a.createdAt);
-                    const isScheduled = a.scheduledAt && new Date(a.scheduledAt) > new Date();
+                    const date = new Date(a.created_at);
+                    const isScheduled = a.scheduled_at && new Date(a.scheduled_at) > new Date();
                     return (
                       <div key={a.id} className="border border-border rounded-xl p-4 sm:p-5 space-y-3">
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -381,31 +382,17 @@ const TemplatesAnnouncements = () => {
                               {a.visibility === "All Students" ? <Users size={12} /> : <User size={12} />}
                               {a.visibility}
                             </Badge>
-                            {isScheduled && <Badge variant="outline" className="gap-1 text-accent-foreground border-accent"><Clock size={12} /> Scheduled</Badge>}
+                            {isScheduled && <Badge variant="outline" className="gap-1"><Clock size={12} /> Scheduled</Badge>}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Clock size={12} /> {date.toLocaleDateString()} at {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </div>
+                          </span>
                         </div>
-
                         <p className="text-sm text-foreground leading-relaxed">{a.text}</p>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            {a.attachmentName && (
-                              <button className="flex items-center gap-1 text-xs text-primary hover:underline" onClick={() => toast({ title: "Downloading…", description: a.attachmentName })}>
-                                <Paperclip size={12} /> {a.attachmentName}
-                              </button>
-                            )}
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Eye size={12} /> {a.acknowledged}/{a.total} acknowledged
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 text-xs" onClick={() => deleteAnnouncement(a.id)}>
-                              <Trash2 size={14} /> Delete
-                            </Button>
-                          </div>
+                        <div className="flex justify-end">
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-7 text-xs" onClick={() => deleteAnnouncement(a.id)}>
+                            <Trash2 size={14} /> Delete
+                          </Button>
                         </div>
                       </div>
                     );
