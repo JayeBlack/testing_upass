@@ -64,7 +64,10 @@ const ThesisUpload = () => {
       const path = `${user.id}/${Date.now()}-${stage.replace(/\s+/g, "_")}.${ext}`;
       const { error: upErr } = await supabase.storage
         .from("thesis-files")
-        .upload(path, selectedFile, { contentType: selectedFile.type });
+        .upload(path, selectedFile, { 
+          contentType: selectedFile.type,
+          contentDisposition: 'inline'
+        });
       if (upErr) throw upErr;
 
       const { error: insErr } = await supabase.from("thesis_submissions").insert({

@@ -9,6 +9,8 @@ const setResourceSubdir = (req, res, next) => {
 };
 
 router.use(authenticate);
+router.get("/current/stats", ctrl.getDashboardStats);
+router.get("/current/submissions", ctrl.getCurrentSupervisorSubmissions);
 router.get("/", ctrl.getAll);
 router.get("/assignments", ctrl.getAllAssignments);
 router.get("/:id", ctrl.getById);

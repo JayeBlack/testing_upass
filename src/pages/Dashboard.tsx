@@ -8,6 +8,9 @@ import {
   ArrowUpRight, TrendingUp, TrendingDown, Activity, Banknote,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 const StatCard = ({
   icon, label, value, sub, trend, accent, onClick,
@@ -58,6 +61,55 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { students, graduands } = useDataStore();
   const { isSuperAdmin, adminDepartment } = useAdminDepartment();
+  const [supervisorData, setSupervisorData] = useState({ assignedStudents: "—", pendingReviews: "—" });
+
+  useEffect(() => {
+    if (user?.role !== "Supervisor") return;
+
+    const fetchSupervisorStats = async () => {
+      try {
+        const [backendStats, supervisorStudents] = await Promise.all([
+          apiFetch<any>("/supervisors/current/stats"),
+          apiFetch<any>("/supervisors/current/submissions"),
+        ]);
+
+        const students: { index_number: string }[] = supervisorStudents.students || [];
+        const assignedIndexSet = new Set(
+          students.map((s) => s.index_number?.trim().toLowerCase()).filter(Boolean)
+        );
+
+        const { data: submissions, error } = await supabase
+          .from("thesis_submissions")
+          .select("student_index, status")
+          .eq("status", "Pending");
+
+        const pendingCount = !error && submissions
+          ? submissions.filter((sub: any) =>
+              assignedIndexSet.has(sub.student_index?.trim().toLowerCase())
+            ).length
+          : 0;
+
+        setSupervisorData({
+          assignedStudents: String(backendStats.assignedStudents || 0),
+          pendingReviews: String(pendingCount),
+        });
+      } catch {
+        // silently fail
+      }
+    };
+
+    fetchSupervisorStats();
+
+    const channel = supabase
+      .channel("dashboard_supervisor_submissions")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "thesis_submissions" },
+        () => fetchSupervisorStats()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   // Filter data by department for departmental admins
   const deptStudents = adminDepartment
@@ -80,8 +132,8 @@ const Dashboard = () => {
   ];
 
   const supervisorStats = [
-    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Assigned Students", value: "—", accent: true },
-    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "—" },
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Assigned Students", value: supervisorData.assignedStudents, accent: true, onClick: () => navigate("/students") },
+    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: supervisorData.pendingReviews, onClick: () => navigate("/submissions") },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Approved This Month", value: "—" },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Avg Review Time", value: "—" },
   ];

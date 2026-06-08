@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Users, FileText, Clock, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -14,7 +14,7 @@ interface Student {
 }
 
 interface SubmissionStage {
-  student_id: string;
+  student_index: string;
   stage: string;
   status: string;
 }
@@ -23,60 +23,56 @@ const AssignedStudents = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [stages, setStages] = useState<SubmissionStage[]>([]);
-  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const studentsRef = useRef<Student[]>([]);
+
+  const fetchStages = useCallback(async () => {
+    const list = studentsRef.current;
+    if (list.length === 0) { setStages([]); return; }
+    const assignedIndexSet = new Set(
+      list.map((s) => s.index_number?.trim().toLowerCase()).filter(Boolean)
+    );
+    const { data: subs } = await supabase
+      .from("thesis_submissions")
+      .select("student_index, stage, status")
+      .order("submitted_at", { ascending: false });
+    const filtered = (subs || []).filter((s: any) =>
+      assignedIndexSet.has(s.student_index?.trim().toLowerCase())
+    );
+    setStages(filtered);
+  }, []);
 
   useEffect(() => {
+    if (!user?.id) return;
     const load = async () => {
       setLoading(true);
       try {
-        // Fetch assigned students from backend - need to map user.id to supervisor record id first
-        const supervisors = await apiFetch<any[]>("/supervisors");
-        const currentSupervisor = supervisors.find((s: any) => String(s.user_id) === String(user?.id));
-        
-        if (!currentSupervisor) {
-          setLoading(false);
-          return;
-        }
-
-        const data = await apiFetch<Student[]>(`/supervisors/${currentSupervisor.id}/students`);
-        setStudents(data || []);
-
-        if (data && data.length > 0) {
-          const ids = data.map((s) => s.id);
-
-          // Fetch latest submission stage per student from Supabase
-          const { data: subs } = await supabase
-            .from("thesis_submissions")
-            .select("student_id, stage, status")
-            .in("student_id", ids)
-            .order("submitted_at", { ascending: false });
-
-          setStages(subs || []);
-          setPendingCount((subs || []).filter((s) => s.status === "Pending").length);
-        }
+        const supervisorStudents = await apiFetch<any>("/supervisors/current/submissions");
+        const list: Student[] = supervisorStudents.students || [];
+        studentsRef.current = list;
+        setStudents(list);
+        await fetchStages();
       } catch {
-        // backend not reachable — leave empty
+        // backend not reachable
       } finally {
         setLoading(false);
       }
     };
-    if (user?.id) load();
+    load();
 
-    // Real-time subscription
     const channel = supabase
-      .channel('student_submissions_changes')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'thesis_submissions' },
-        () => { if (user?.id) load(); }
+      .channel("assigned_students_stages")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "thesis_submissions" },
+        () => fetchStages()
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user?.id]);
+  }, [user?.id, fetchStages]);
 
-  const latestStage = (studentId: string) => {
-    const sub = stages.find((s) => s.student_id === studentId);
+  const latestStage = (indexNumber: string) => {
+    const sub = stages.find((s) => s.student_index?.trim().toLowerCase() === indexNumber?.trim().toLowerCase());
     return sub?.stage ?? "Not started";
   };
 
@@ -102,7 +98,9 @@ const AssignedStudents = () => {
             <FileText size={18} className="text-muted-foreground" />
           </div>
           <div>
-            <p className="text-2xl font-bold font-display text-foreground">{loading ? "—" : pendingCount}</p>
+            <p className="text-2xl font-bold font-display text-foreground">
+              {loading ? "—" : stages.filter((s) => s.status === "Pending").length}
+            </p>
             <p className="text-xs text-muted-foreground">Pending Reviews</p>
           </div>
         </div>
@@ -112,10 +110,7 @@ const AssignedStudents = () => {
           </div>
           <div>
             <p className="text-2xl font-bold font-display text-foreground">
-              {loading ? "—" : students.filter((s) => {
-                const studentSubs = stages.filter((st) => st.student_id === s.id);
-                return !studentSubs.some((st) => st.status === "Approved");
-              }).length}
+              {loading ? "—" : stages.filter((s) => s.status !== "Approved" && s.status !== "Rejected").length}
             </p>
             <p className="text-xs text-muted-foreground">Awaiting Approval</p>
           </div>
@@ -145,7 +140,7 @@ const AssignedStudents = () => {
                   <td className="px-6 py-4 text-sm font-medium text-foreground">{s.name}</td>
                   <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{s.index_number}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{s.program_name}</td>
-                  <td className="px-6 py-4 text-sm text-foreground">{latestStage(s.id)}</td>
+                  <td className="px-6 py-4 text-sm text-foreground">{latestStage(s.index_number)}</td>
                 </tr>
               ))}
             </tbody>

@@ -75,7 +75,7 @@ exports.unassignStudent = async (req, res) => {
   }
 };
 
-// GET /api/supervisors/assignments — all assignments with names
+// GET /api/supervisors/assignments
 exports.getAllAssignments = async (req, res) => {
   try {
     const result = await db.query(
@@ -112,6 +112,80 @@ exports.assignStudent = async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err.code === "23505") return res.status(409).json({ error: "Already assigned" });
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET /api/supervisors/current/stats
+exports.getDashboardStats = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+    const supervisorResult = await db.query(
+      "SELECT id FROM supervisors WHERE user_id = $1",
+      [userId]
+    );
+    if (supervisorResult.rows.length === 0) {
+      return res.status(404).json({ error: "Supervisor record not found" });
+    }
+    const supervisorId = supervisorResult.rows[0].id;
+
+    const studentsResult = await db.query(
+      "SELECT COUNT(*) as count FROM student_supervisors WHERE supervisor_id = $1",
+      [supervisorId]
+    );
+    const assignedStudents = parseInt(studentsResult.rows[0].count, 10);
+
+    res.json({
+      assignedStudents,
+      pendingReviews: 0,
+      approvedThisMonth: 0,
+      avgReviewTime: "—",
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// GET /api/supervisors/current/submissions
+exports.getCurrentSupervisorSubmissions = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+    const supervisorResult = await db.query(
+      "SELECT id FROM supervisors WHERE user_id = $1",
+      [userId]
+    );
+    if (supervisorResult.rows.length === 0) {
+      return res.status(404).json({ error: "Supervisor record not found" });
+    }
+    const supervisorId = supervisorResult.rows[0].id;
+
+    const studentsResult = await db.query(
+      "SELECT student_id FROM student_supervisors WHERE supervisor_id = $1",
+      [supervisorId]
+    );
+    const studentIds = studentsResult.rows.map(row => row.student_id);
+
+    if (studentIds.length === 0) {
+      return res.json([]);
+    }
+
+    const studentNames = await db.query(
+      `SELECT s.id, CONCAT(u.first_name, ' ', u.last_name) as name, s.index_number
+       FROM students s
+       JOIN users u ON s.user_id = u.id
+       WHERE s.id = ANY($1)`,
+      [studentIds]
+    );
+
+    res.json({
+      studentIds,
+      students: studentNames.rows,
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
