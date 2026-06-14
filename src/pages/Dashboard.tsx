@@ -56,118 +56,71 @@ interface StatItem {
   onClick?: () => void;
 }
 
-interface FeeSummary {
-  total_fees: number;
-  total_paid: number;
-  total_students: number;
-  cleared_count: number;
-  owing_count: number;
-  compliance_rate: number;
-}
-
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { students, graduands } = useDataStore();
   const { isSuperAdmin, adminDepartment } = useAdminDepartment();
+  const [supervisorData, setSupervisorData] = useState({ assignedStudents: "—", pendingReviews: "—" });
+  const [stats, setStats] = useState({ totalStudents: 0, activeStudents: 0, totalGraduands: 0, avgCwa: 0 });
 
-  // Live data states
-  const [feeSummary, setFeeSummary] = useState<FeeSummary | null>(null);
-  const [studentFeeData, setStudentFeeData] = useState<any[]>([]);
-  const [activeCoursesCount, setActiveCoursesCount] = useState("—");
-  const [resultsBatches, setResultsBatches] = useState<any[]>([]);
-  const [supervisorData, setSupervisorData] = useState({ assignedStudents: "—", pendingReviews: "—", approvedThisMonth: "—" });
-
-  // Generic periodic fetch helper
-  const fetchWithInterval = (fetcher: () => Promise<void>, ms: number) => {
-    fetcher();
-    const id = setInterval(fetcher, ms);
-    return () => clearInterval(id);
-  };
-
-  // ─── Accountant / Admin Fee Summary ───
   useEffect(() => {
-    if (user?.role !== "Accountant" && user?.role !== "Admin" && user?.role !== "Dean" && user?.role !== "ExamsOfficer") return;
-    return fetchWithInterval(async () => {
+    const fetchDashboardData = async () => {
       try {
-        const data = await apiFetch<FeeSummary>("/fees/summary");
-        setFeeSummary(data);
-      } catch { /* ignore */ }
-    }, 15000);
-  }, [user]);
+        const deptParam = adminDepartment && adminDepartment !== "all" ? `?department=${adminDepartment}` : "";
+        const overview = await apiFetch<any>(`/analytics/overview${deptParam}`);
+        setStats({
+          totalStudents: overview.total_students || 0,
+          activeStudents: overview.active_students || 0,
+          totalGraduands: overview.graduands_eligible || 0,
+          avgCwa: parseFloat(overview.avg_cwa) || 0,
+        });
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+      }
+    };
 
-  // ─── Student fee data ───
-  useEffect(() => {
-    if (user?.role !== "Student") return;
-    return fetchWithInterval(async () => {
-      try {
-        const data = await apiFetch<any[]>(`/fees/student/${user.id}`);
-        setStudentFeeData(data || []);
-      } catch { /* ignore */ }
-    }, 15000);
-  }, [user]);
+    if (user?.role === "Admin" || user?.role === "Dean" || user?.role === "ViceDean" || user?.role === "Registrar" || user?.role === "ExamsOfficer") {
+      fetchDashboardData();
+    }
+  }, [user, adminDepartment]);
 
-  // ─── Active courses count ───
-  useEffect(() => {
-    if (user?.role !== "Admin" && user?.role !== "Dean") return;
-    return fetchWithInterval(async () => {
-      try {
-        const courses = await apiFetch<any[]>("/courses");
-        setActiveCoursesCount(String(courses?.filter((c: any) => c.is_active !== false).length || 0));
-      } catch { /* ignore */ }
-    }, 30000);
-  }, [user]);
-
-  // ─── Results batches (ExamsOfficer) ───
-  useEffect(() => {
-    if (user?.role !== "ExamsOfficer") return;
-    return fetchWithInterval(async () => {
-      try {
-        const batches = await apiFetch<any[]>("/results/batches");
-        setResultsBatches(batches || []);
-      } catch { /* ignore */ }
-    }, 15000);
-  }, [user]);
-
-  // ─── Supervisor stats ───
   useEffect(() => {
     if (user?.role !== "Supervisor") return;
+
     const fetchSupervisorStats = async () => {
       try {
         const [backendStats, supervisorStudents] = await Promise.all([
           apiFetch<any>("/supervisors/current/stats"),
           apiFetch<any>("/supervisors/current/submissions"),
         ]);
+
         const students: { index_number: string }[] = supervisorStudents.students || [];
         const assignedIndexSet = new Set(
           students.map((s) => s.index_number?.trim().toLowerCase()).filter(Boolean)
         );
+
         const { data: submissions, error } = await supabase
           .from("thesis_submissions")
-          .select("student_index, status, created_at");
+          .select("student_index, status")
+          .eq("status", "Pending");
+
         const pendingCount = !error && submissions
           ? submissions.filter((sub: any) =>
-              assignedIndexSet.has(sub.student_index?.trim().toLowerCase()) && sub.status === "Pending"
+              assignedIndexSet.has(sub.student_index?.trim().toLowerCase())
             ).length
           : 0;
-        // Approved this month
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-        const approvedThisMonth = !error && submissions
-          ? submissions.filter((sub: any) =>
-              assignedIndexSet.has(sub.student_index?.trim().toLowerCase()) &&
-              sub.status === "Approved" &&
-              sub.created_at >= monthStart
-            ).length
-          : 0;
+
         setSupervisorData({
           assignedStudents: String(backendStats.assignedStudents || 0),
           pendingReviews: String(pendingCount),
-          approvedThisMonth: String(approvedThisMonth),
         });
-      } catch { /* silently fail */ }
+      } catch {
+        // silently fail
+      }
     };
+
     fetchSupervisorStats();
+
     const channel = supabase
       .channel("dashboard_supervisor_submissions")
       .on("postgres_changes",
@@ -175,53 +128,33 @@ const Dashboard = () => {
         () => fetchSupervisorStats()
       )
       .subscribe();
-    const interval = setInterval(fetchSupervisorStats, 30000);
-    return () => { supabase.removeChannel(channel); clearInterval(interval); };
+
+    return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  // Filter data by department for departmental admins
-  const deptStudents = adminDepartment
-    ? students.filter((s) => s.department === adminDepartment)
-    : students;
-  const deptGraduands = adminDepartment
-    ? graduands.filter((g) => g.department === adminDepartment)
-    : graduands;
-
-  const totalStudents = deptStudents.length;
-  const activeStudents = deptStudents.filter((s) => s.status === "Active").length;
-  const totalGraduands = deptGraduands.filter((g) => g.status === "Eligible").length;
+  const totalStudents = stats.totalStudents;
+  const activeStudents = stats.activeStudents;
+  const totalGraduands = stats.totalGraduands;
+  const avgCwa = stats.avgCwa;
   const feesClearedPct = totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0;
-
-  // Student computed data
-  const totalStudentFees = studentFeeData.reduce((sum: number, f: any) => sum + (f.total_amount || 0), 0);
-  const totalStudentPaid = studentFeeData.reduce((sum: number, f: any) => sum + (f.amount_paid || 0), 0);
-  const totalStudentOwed = studentFeeData.reduce((sum: number, f: any) => sum + (f.outstanding || 0), 0);
-  const hasOutstanding = totalStudentOwed > 0;
-
-  // Exams Officer computed
-  const publishedBatches = resultsBatches.filter((b: any) => b.status === "Published").length;
-  const pendingBatches = resultsBatches.filter((b: any) => b.status === "Draft").length;
-
-  const formatGHS = (amount: number) =>
-    `GHS ${amount.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   const studentStats = [
     { icon: <BookOpen size={18} className="text-secondary-foreground" />, label: "Registered Courses", value: "—", accent: true },
     { icon: <FileText size={18} className="text-muted-foreground" />, label: "Thesis Progress", value: "—" },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Total Fees", value: studentFeeData.length > 0 ? formatGHS(totalStudentFees) : "—" },
-    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Outstanding Balance", value: studentFeeData.length > 0 ? formatGHS(totalStudentOwed) : "—" },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "CWA", value: "—" },
+    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: "—" },
   ];
 
   const supervisorStats = [
     { icon: <Users size={18} className="text-secondary-foreground" />, label: "Assigned Students", value: supervisorData.assignedStudents, accent: true, onClick: () => navigate("/students") },
     { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Reviews", value: supervisorData.pendingReviews, onClick: () => navigate("/submissions") },
-    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Approved This Month", value: supervisorData.approvedThisMonth },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Approved This Month", value: "—" },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Avg Review Time", value: "—" },
   ];
 
   const adminStats = [
     { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
-    { icon: <BookOpen size={18} className="text-muted-foreground" />, label: "Active Courses", value: activeCoursesCount },
+    { icon: <BookOpen size={18} className="text-muted-foreground" />, label: "Active Courses", value: "—" },
     { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Fees Cleared", value: `${feesClearedPct}%`, onClick: () => navigate("/admin/fees") },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
   ];
@@ -229,20 +162,20 @@ const Dashboard = () => {
   const deanStats = [
     { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Clearances Pending", value: "—", onClick: () => navigate("/dean/clearance") },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Avg CWA", value: deptGraduands.length > 0 ? (deptGraduands.reduce((a, g) => a + g.cwa, 0) / deptGraduands.length).toFixed(1) : "—" },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Avg CWA", value: avgCwa > 0 ? avgCwa.toFixed(1) : "—" },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
   ];
 
   const accountantStats = [
-    { icon: <Banknote size={18} className="text-secondary-foreground" />, label: "Total Fees Collected", value: feeSummary ? formatGHS(feeSummary.total_paid) : "—", accent: true, onClick: () => navigate("/accountant/analytics") },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: feeSummary ? `${feeSummary.compliance_rate}%` : "—" },
-    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: feeSummary ? String(feeSummary.owing_count) : "—", onClick: () => navigate("/admin/fees") },
-    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Total Fees", value: feeSummary ? formatGHS(feeSummary.total_fees) : "—" },
+    { icon: <Banknote size={18} className="text-secondary-foreground" />, label: "Total Fees Collected", value: "—", accent: true, onClick: () => navigate("/accountant/analytics") },
+    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: "—" },
+    { icon: <Users size={18} className="text-muted-foreground" />, label: "Outstanding Students", value: "—", onClick: () => navigate("/admin/fees") },
+    { icon: <Clock size={18} className="text-muted-foreground" />, label: "Pending Receipts", value: "—" },
   ];
 
   const examsOfficerStats = [
-    { icon: <BarChart3 size={18} className="text-secondary-foreground" />, label: "Results Published", value: String(publishedBatches), accent: true },
-    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Batches", value: String(pendingBatches) },
+    { icon: <BarChart3 size={18} className="text-secondary-foreground" />, label: "Results Published", value: "—", accent: true },
+    { icon: <FileText size={18} className="text-muted-foreground" />, label: "Pending Batches", value: "—" },
     { icon: <Users size={18} className="text-muted-foreground" />, label: "Total Students", value: String(totalStudents) },
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "—" },
   ];
@@ -251,7 +184,7 @@ const Dashboard = () => {
     Student: studentStats, Supervisor: supervisorStats, Admin: adminStats, Dean: deanStats, Accountant: accountantStats, ExamsOfficer: examsOfficerStats,
     ViceDean: deanStats, Registrar: adminStats, AdminAssistant: adminStats, AccountingAssistant: accountantStats,
   };
-  const stats = roleStatsMap[user?.role || "Student"] ?? studentStats;
+  const displayStats = roleStatsMap[user?.role || "Student"] ?? studentStats;
 
   const quickActionRoutes: Record<string, string> = {
     "Register Courses": "/courses/register",
@@ -351,7 +284,7 @@ const Dashboard = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {stats.map((s) => (
+        {displayStats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}
       </div>
