@@ -5,6 +5,7 @@ const db = require("../db");
 exports.getOverview = async (req, res) => {
   try {
     const { department, academic_year } = req.query;
+    console.log('[Analytics] getOverview called with:', { department, academic_year, userId: req.user?.id });
     
     let deptFilter = "";
     let yearFilter = "";
