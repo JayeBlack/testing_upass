@@ -33,98 +33,6 @@ exports.getByStudent = async (req, res) => {
   }
 };
 
-<<<<<<< HEAD
-// POST /api/results/grades/by-index (batch grade entry by index number — used by GradeEntry UI)
-exports.enterGradesByIndex = async (req, res) => {
-  try {
-    const { grades, semester, academic_year } = req.body;
-=======
-// POST /api/results/batch-upload (upload grades from CSV/Excel)
-exports.batchUpload = async (req, res) => {
-  try {
-    const { grades, semester, academicYear } = req.body;
-
->>>>>>> ad2fa65ae8c2c44e66ca9722ec3f3c9f65bd4d26
-    if (!grades || !Array.isArray(grades) || grades.length === 0) {
-      return res.status(400).json({ error: "Grades array required" });
-    }
-
-<<<<<<< HEAD
-=======
-    const results = [];
-    const failedRows = [];
-
-    for (let i = 0; i < grades.length; i++) {
-      const g = grades[i];
-      try {
-        // Find student by index number
-        const studentRes = await db.query(
-          `SELECT s.id, s.student_id FROM students s WHERE s.index_number = $1`,
-          [g.indexNumber]
-        );
-        
-        if (studentRes.rows.length === 0) {
-          failedRows.push({ row: i + 2, indexNumber: g.indexNumber, reason: "Student not found" });
-          continue;
-        }
-
-        const studentId = studentRes.rows[0].id;
-
-        // Find or create course
-        let courseRes = await db.query(
-          `SELECT id FROM courses WHERE name = $1 AND academic_year = $2`,
-          [g.courseName, academicYear]
-        );
-
-        let courseId;
-        if (courseRes.rows.length === 0) {
-          // Create new course if it doesn't exist
-          const createRes = await db.query(
-            `INSERT INTO courses (code, name, credits, academic_year, semester)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id`,
-            [g.courseName.toUpperCase().replace(/\s+/g, "_"), g.courseName, g.credits, academicYear, semester]
-          );
-          courseId = createRes.rows[0].id;
-        } else {
-          courseId = courseRes.rows[0].id;
-        }
-
-        // Insert or update grade
-        const gradeRes = await db.query(
-          `INSERT INTO grades (student_id, course_id, grade, marks, semester, academic_year, entered_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT (student_id, course_id, academic_year) DO UPDATE
-           SET grade = $3, marks = $4, entered_by = $7, entered_at = NOW()
-           RETURNING *`,
-          [studentId, courseId, g.grade, g.marks, semester, academicYear, req.user.id]
-        );
-        results.push(gradeRes.rows[0]);
-      } catch (err) {
-        failedRows.push({ row: i + 2, indexNumber: g.indexNumber, reason: err.message });
-      }
-    }
-
-    // Create result batch record
-    const batchRes = await db.query(
-      `INSERT INTO result_batches (semester, academic_year, status, published_at, published_by, student_count)
-       VALUES ($1, $2, $3, NOW(), $4, $5)
-       RETURNING id`,
-      [semester, academicYear, "Published", req.user.id, results.length]
-    );
-
-    res.status(201).json({
-      batchId: batchRes.rows[0].id,
-      message: `${results.length} grades uploaded`,
-      gradesUploaded: results.length,
-      failed: failedRows.length,
-      failedRows: failedRows,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
 // POST /api/results/grades/by-index (batch grade entry by index number — used by GradeEntry UI)
 exports.enterGradesByIndex = async (req, res) => {
   try {
@@ -134,7 +42,6 @@ exports.enterGradesByIndex = async (req, res) => {
       return res.status(400).json({ error: "Grades array required" });
     }
 
->>>>>>> ad2fa65ae8c2c44e66ca9722ec3f3c9f65bd4d26
     // Convert semester string to number ("Semester 1" -> 1)
     const semesterNum = typeof semester === 'string' ? parseInt(semester.replace(/\D/g, '')) || 1 : semester;
 
@@ -202,11 +109,6 @@ exports.enterGradesByIndex = async (req, res) => {
 // DELETE /api/results/batch/:id (delete a result batch)
 exports.deleteBatch = async (req, res) => {
   try {
-<<<<<<< HEAD
-    const result = await db.query("DELETE FROM result_batches WHERE id = $1 RETURNING id", [req.params.id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: "Batch not found" });
-    res.json({ message: "Batch deleted" });
-=======
     const { id } = req.params;
 
     // Get batch details
@@ -235,7 +137,6 @@ exports.deleteBatch = async (req, res) => {
     );
 
     res.json({ message: "Batch deleted successfully" });
->>>>>>> ad2fa65ae8c2c44e66ca9722ec3f3c9f65bd4d26
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
