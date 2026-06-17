@@ -1,12 +1,10 @@
 const db = require("../db");
-const { getDepartmentFilter } = require("../middleware/departmentFilter");
 
 // GET /api/analytics/overview
 // Returns high-level statistics
 exports.getOverview = async (req, res) => {
   try {
     const { department, academic_year } = req.query;
-    console.log('[Analytics] getOverview called with:', { department, academic_year, userId: req.user?.id });
     
     // Build parameters array once for consistent indexing across all queries
     const buildParams = () => {
@@ -51,7 +49,6 @@ exports.getOverview = async (req, res) => {
       params
     );
 
-<<<<<<< HEAD
     // Fees - Updated to use fee_records table with proper NULL handling
     const feesQuery = await db.query(
       `SELECT 
@@ -61,17 +58,6 @@ exports.getOverview = async (req, res) => {
          COUNT(CASE WHEN fr.status IN ('Pending', 'Partial') THEN 1 END) as owing_count
        FROM fee_records fr
        JOIN students s ON fr.student_id = s.id
-=======
-    // Fees - FIXED to use fee_records table
-    const feesQuery = await db.query(
-      `SELECT 
-         COALESCE(SUM(f.amount_paid), 0) as collected,
-         COALESCE(SUM(f.outstanding), 0) as owing,
-         COUNT(CASE WHEN f.is_cleared = TRUE THEN 1 END) as cleared_count,
-         COUNT(CASE WHEN f.is_cleared = FALSE THEN 1 END) as owing_count
-       FROM fee_records f
-       JOIN students s ON f.student_id = s.id
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
        LEFT JOIN departments d ON s.department_id = d.id
        WHERE 1=1 ${getDeptFilter()} ${getYearFilter()}`,
       params
@@ -93,7 +79,6 @@ exports.getOverview = async (req, res) => {
       params
     );
 
-<<<<<<< HEAD
     // Thesis defended
     const thesisQuery = await db.query(
       `SELECT COALESCE(COUNT(*), 0) as defended
@@ -103,11 +88,6 @@ exports.getOverview = async (req, res) => {
        WHERE t.status = 'Defended' ${getDeptFilter()} ${getYearFilter()}`,
       params
     );
-=======
-    // Thesis defended - for now return 0 (thesis tracking is in Supabase)
-    // TODO: Integrate with Supabase thesis_submissions table
-    const thesisQuery = { rows: [{ defended: 0 }] };
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
 
     const students = studentsQuery.rows[0];
     const graduands = graduandsQuery.rows[0] || { eligible: 0, ineligible: 0 };
@@ -161,13 +141,10 @@ exports.getEnrollmentByDept = async (req, res) => {
       `SELECT 
          COALESCE(d.name, 'Unassigned') as department,
          COUNT(s.id) as students,
-         COUNT(CASE WHEN s.gender = 'Male' THEN 1 END) as male,
-         COUNT(CASE WHEN s.gender = 'Female' THEN 1 END) as female
+         COUNT(CASE WHEN u.gender = 'Male' THEN 1 END) as male,
+         COUNT(CASE WHEN u.gender = 'Female' THEN 1 END) as female
        FROM students s
-<<<<<<< HEAD
        LEFT JOIN users u ON s.user_id = u.id
-=======
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
        LEFT JOIN departments d ON s.department_id = d.id
        WHERE s.id IS NOT NULL ${deptFilter} ${yearFilter}
        GROUP BY d.id, d.name
@@ -193,10 +170,8 @@ exports.getFeesTrend = async (req, res) => {
       params.push(department);
     }
 
-    // FIXED: Use fee_records.created_at instead of fees.due_date
     const result = await db.query(
       `SELECT 
-<<<<<<< HEAD
          TO_CHAR(fr.created_at, 'Mon') as month,
          TO_CHAR(fr.created_at, 'YYYY-MM') as period,
          COALESCE(SUM(CASE WHEN fr.status = 'Paid' THEN fr.amount_paid ELSE 0 END), 0) as collected,
@@ -207,18 +182,6 @@ exports.getFeesTrend = async (req, res) => {
        WHERE fr.created_at >= NOW() - INTERVAL '1 month' * $1 ${deptFilter}
        GROUP BY TO_CHAR(fr.created_at, 'Mon'), TO_CHAR(fr.created_at, 'YYYY-MM'), DATE_TRUNC('month', fr.created_at)
        ORDER BY DATE_TRUNC('month', fr.created_at)`,
-=======
-         TO_CHAR(f.created_at, 'Mon') as month,
-         TO_CHAR(f.created_at, 'YYYY-MM') as period,
-         SUM(f.amount_paid) as collected,
-         SUM(f.total_amount) as target
-       FROM fee_records f
-       JOIN students s ON f.student_id = s.id
-       LEFT JOIN departments d ON s.department_id = d.id
-       WHERE f.created_at >= NOW() - INTERVAL '1 month' * $1 ${deptFilter}
-       GROUP BY TO_CHAR(f.created_at, 'Mon'), TO_CHAR(f.created_at, 'YYYY-MM'), DATE_TRUNC('month', f.created_at)
-       ORDER BY DATE_TRUNC('month', f.created_at)`,
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
       params
     );
 
@@ -240,16 +203,24 @@ exports.getThesisProgress = async (req, res) => {
       params.push(department);
     }
 
-    // FIXED: Use basic thesis stage tracking or return empty for now
-    // Thesis progress should eventually come from Supabase thesis_submissions
     const result = await db.query(
       `SELECT 
-         'Not Started' as stage,
+         COALESCE(t.status, 'Not Started') as stage,
          COUNT(*) as value
        FROM students s
+       LEFT JOIN thesis_submissions t ON s.id = t.student_id
        LEFT JOIN departments d ON s.department_id = d.id
-       WHERE s.status = 'Active' ${deptFilter}
-       GROUP BY stage`,
+       WHERE 1=1 ${deptFilter}
+       GROUP BY t.status
+       ORDER BY 
+         CASE t.status
+           WHEN 'Proposal' THEN 1
+           WHEN 'Chapter 1-2' THEN 2
+           WHEN 'Chapter 3-4' THEN 3
+           WHEN 'Submitted' THEN 4
+           WHEN 'Defended' THEN 5
+           ELSE 0
+         END`,
       params
     );
 
@@ -419,7 +390,6 @@ exports.getAlerts = async (req, res) => {
 
     const alerts = [];
 
-<<<<<<< HEAD
     // Outstanding fees - Updated to use fee_records
     const feesResult = await db.query(
       `SELECT COUNT(*) as count
@@ -427,15 +397,6 @@ exports.getAlerts = async (req, res) => {
        JOIN students s ON fr.student_id = s.id
        LEFT JOIN departments d ON s.department_id = d.id
        WHERE fr.status IN ('Pending', 'Partial') ${deptFilter}`,
-=======
-    // Outstanding fees - FIXED
-    const feesResult = await db.query(
-      `SELECT COUNT(*) as count
-       FROM fee_records f
-       JOIN students s ON f.student_id = s.id
-       LEFT JOIN departments d ON s.department_id = d.id
-       WHERE f.is_cleared = FALSE ${deptFilter}`,
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
       params
     );
     const feesCount = parseInt(feesResult.rows[0]?.count || 0);

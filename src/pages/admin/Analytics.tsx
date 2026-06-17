@@ -146,17 +146,12 @@ const Analytics = () => {
     try {
       const deptParam = department && department !== "all" ? `?department=${department}` : "";
       
-<<<<<<< HEAD
       // Fetch each endpoint individually so one failure doesn't cascade and wipe all data
       async function fetchSafe<T>(url: string): Promise<T | null> {
         try { return await apiFetch<T>(url); }
         catch { return null; }
       }
 
-=======
-      console.log('[Analytics] Fetching data from /analytics/overview' + deptParam);
-      
->>>>>>> f6e2c3bd2440cd45d1133c91074ebc9793361b21
       const [
         overviewData,
         enrollmentData,
@@ -178,9 +173,6 @@ const Analytics = () => {
         fetchSafe<{ departments: number; programs: number }>(`/analytics/counts${deptParam}`),
         fetchSafe<Alert[]>(`/analytics/alerts${deptParam}`),
       ]);
-
-      console.log('[Analytics] Overview data received:', overviewData);
-      console.log('[Analytics] Total students:', overviewData.total_students);
 
       setOverview(overviewData);
       setEnrollmentByDept(enrollmentData || []);
