@@ -74,8 +74,8 @@ const App = () => (
             <Route path="/supervisor/ai" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><AIAssistant /></RoleGuard></RequireAuth>} />
             {/* Admin - Shared with multiple roles */}
             <Route path="/admin/students" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer"]}><ManageStudents /></RoleGuard></RequireAuth>} />
-            <Route path="/admin/fees" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Accountant", "AccountingAssistant", "ExamsOfficer"]}><FeesStatus /></RoleGuard></RequireAuth>} />
-            <Route path="/admin/passlist" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "ExamsOfficer"]}><PassList /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/fees" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Accountant", "AccountingAssistant", "Dean", "ViceDean", "ExamsOfficer", "Registrar", "AdminAssistant"]}><FeesStatus /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/passlist" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer"]}><PassList /></RoleGuard></RequireAuth>} />
             <Route path="/admin/analytics" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "ExamsOfficer"]}><Analytics /></RoleGuard></RequireAuth>} />
             <Route path="/admin/log" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><SystemLog /></RoleGuard></RequireAuth>} />
             <Route path="/admin/documents" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant"]}><ManageDocuments /></RoleGuard></RequireAuth>} />

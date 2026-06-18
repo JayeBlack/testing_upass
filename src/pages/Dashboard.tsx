@@ -86,18 +86,24 @@ const Dashboard = () => {
     return () => clearInterval(id);
   };
 
-  // ─── Accountant / Admin / Dean / AccountingAssistant Fee Summary ───
+  // ─── Accountant / Admin / Dean / AccountingAssistant / Registrar / AdminAssistant Fee Summary ───
   useEffect(() => {
-    const fetchRoles = ["Accountant", "Admin", "Dean", "ViceDean", "ExamsOfficer", "AccountingAssistant"];
+    const fetchRoles = ["Accountant", "Admin", "Dean", "ViceDean", "ExamsOfficer", "AccountingAssistant", "Registrar", "AdminAssistant"];
     if (!user?.role || !fetchRoles.includes(user.role)) return;
     
     return fetchWithInterval(async () => {
       try {
         const params = adminDepartment ? `?department=${encodeURIComponent(adminDepartment)}` : "";
+        console.log(`[Dashboard] Fetching fee summary for ${user.role}...`);
         const data = await apiFetch<FeeSummary>(`/fees/summary${params}`);
+        console.log(`[Dashboard] Fee summary for ${user.role}:`, data);
         setFeeSummary(data);
-      } catch (err) {
-        console.error("Failed to fetch fee summary:", err);
+        if (!data || data.total_students === 0) {
+          console.warn(`[Dashboard] No fee data returned for ${user.role}`);
+        }
+      } catch (err: any) {
+        console.error(`[Dashboard] Failed to fetch fee summary for ${user.role}:`, err);
+        console.error(`[Dashboard] Error details:`, err.message);
       }
     }, 10000);
   }, [user?.role, adminDepartment]);
@@ -212,7 +218,7 @@ const Dashboard = () => {
   const totalStudents = analyticsOverview?.total_students ?? feeSummary?.total_students ?? deptStudents.length;
   const activeStudents = analyticsOverview?.active_students ?? deptStudents.filter((s) => s.status === "Active").length;
   const totalGraduands = deptGraduands.filter((g) => g.status === "Eligible").length;
-  const feesClearedPct = feeSummary?.compliance_rate ?? (totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0);
+  const feesClearedPct = feeSummary?.compliance_rate ?? 0;
 
   // Student computed data - always calculate
   const totalStudentFees = studentFeeData.reduce((sum: number, f: any) => sum + (f.total_amount || 0), 0);
@@ -251,8 +257,17 @@ const Dashboard = () => {
 
   const deanStats = [
     { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
-    { icon: <BarChart3 size={18} className="text-muted-foreground" />, label: "Total Fees Collected", value: feeSummary ? formatGHS(feeSummary.total_paid) : "—", onClick: () => navigate("/admin/fees") },
-    { icon: <Banknote size={18} className="text-muted-foreground" />, label: "Compliance Rate", value: feeSummary ? `${feeSummary.compliance_rate}%` : "—" },
+    { 
+      icon: <BarChart3 size={18} className="text-muted-foreground" />, 
+      label: "Total Fees Collected", 
+      value: feeSummary && feeSummary.total_paid != null ? formatGHS(Number(feeSummary.total_paid)) : "GHS 0.00", 
+      onClick: () => navigate("/admin/fees") 
+    },
+    { 
+      icon: <Banknote size={18} className="text-muted-foreground" />, 
+      label: "Compliance Rate", 
+      value: feeSummary && feeSummary.compliance_rate != null ? `${Math.round(Number(feeSummary.compliance_rate))}%` : "0%" 
+    },
     { icon: <Clock size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
   ];
 
@@ -270,6 +285,38 @@ const Dashboard = () => {
     { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Pass Rate", value: "—" },
   ];
 
+  const registrarStats = [
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
+    { 
+      icon: <BarChart3 size={18} className="text-muted-foreground" />, 
+      label: "Fees Cleared", 
+      value: feeSummary && feeSummary.compliance_rate != null ? `${Math.round(Number(feeSummary.compliance_rate))}%` : "0%", 
+      onClick: () => navigate("/admin/fees") 
+    },
+    { 
+      icon: <Banknote size={18} className="text-muted-foreground" />, 
+      label: "Total Collected", 
+      value: feeSummary && feeSummary.total_paid != null ? formatGHS(Number(feeSummary.total_paid)) : "GHS 0.00" 
+    },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
+  ];
+
+  const adminAssistantStats = [
+    { icon: <Users size={18} className="text-secondary-foreground" />, label: "Total Students", value: String(totalStudents), accent: true, sub: `${activeStudents} active`, onClick: () => navigate("/admin/students") },
+    { 
+      icon: <BarChart3 size={18} className="text-muted-foreground" />, 
+      label: "Fees Cleared", 
+      value: feeSummary && feeSummary.compliance_rate != null ? `${Math.round(Number(feeSummary.compliance_rate))}%` : "0%", 
+      onClick: () => navigate("/admin/fees") 
+    },
+    { 
+      icon: <Banknote size={18} className="text-muted-foreground" />, 
+      label: "Total Collected", 
+      value: feeSummary && feeSummary.total_paid != null ? formatGHS(Number(feeSummary.total_paid)) : "GHS 0.00" 
+    },
+    { icon: <CheckCircle size={18} className="text-muted-foreground" />, label: "Graduands", value: String(totalGraduands), onClick: () => navigate("/admin/passlist") },
+  ];
+
   const roleStatsMap: Record<string, StatItem[]> = {
     Student: studentStats,
     Supervisor: supervisorStats,
@@ -279,8 +326,8 @@ const Dashboard = () => {
     Accountant: accountantStats,
     AccountingAssistant: accountantStats,
     ExamsOfficer: examsOfficerStats,
-    Registrar: adminStats,
-    AdminAssistant: adminStats,
+    Registrar: registrarStats,
+    AdminAssistant: adminAssistantStats,
   };
   const displayStats = roleStatsMap[user?.role || "Student"] ?? studentStats;
 
@@ -307,6 +354,7 @@ const Dashboard = () => {
     "Enter Grades": "/exams/grades",
     "Pass List": "/exams/passlist",
     "Publish Results": "/exams/publish",
+    "View Fees": "/admin/fees",
   };
 
   const quickActionIcons: Record<string, React.ReactNode> = {
@@ -332,6 +380,7 @@ const Dashboard = () => {
     "Enter Grades": <BookOpen size={15} />,
     "Pass List": <CheckCircle size={15} />,
     "Publish Results": <BarChart3 size={15} />,
+    "View Fees": <Banknote size={15} />,
   };
 
   const roleActivities: Record<string, { text: string; time: string }[]> = {
@@ -351,6 +400,10 @@ const Dashboard = () => {
     ? ["Review Pending", "Add Remarks", "View Students"]
     : user?.role === "Dean" || user?.role === "ViceDean"
     ? ["View Analytics", "Manage Students", "Approve Clearance", "Student Fees"]
+    : user?.role === "Registrar"
+    ? ["Manage Students", "View Fees", "Generate List", "View Analytics"]
+    : user?.role === "AdminAssistant"
+    ? ["Manage Students", "View Fees", "Generate List"]
     : user?.role === "Accountant" || user?.role === "AccountingAssistant"
     ? ["Fee Analytics", "Student Fees", "Export Reports", "Fee Notices"]
     : user?.role === "ExamsOfficer"
@@ -372,9 +425,11 @@ const Dashboard = () => {
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5">
           {user?.role === "Student" && `${user.program} · ${user.department}`}
-          {user?.role === "Supervisor" && `Department of ${user.department}`}
+          {user?.role === "Supervisor" && (user.department ? `Department of ${user.department}` : "Supervisor — School of Postgraduate Studies")}
           {user?.role === "Dean" && "Dean — School of Postgraduate Studies"}
           {user?.role === "ViceDean" && "Vice Dean — School of Postgraduate Studies"}
+          {user?.role === "Registrar" && "Registrar's Office — School of Postgraduate Studies"}
+          {user?.role === "AdminAssistant" && (user.department ? `Admin Assistant — ${user.department}` : "Admin Assistant — School of Postgraduate Studies")}
           {user?.role === "Accountant" && "Finance Office — School of Postgraduate Studies"}
           {user?.role === "AccountingAssistant" && "Finance Office Assistant — School of Postgraduate Studies"}
           {user?.role === "ExamsOfficer" && "Examinations Office — School of Postgraduate Studies"}

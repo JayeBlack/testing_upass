@@ -52,8 +52,8 @@ exports.getOverview = async (req, res) => {
     // Fees - Updated to use fee_records table with proper NULL handling
     const feesQuery = await db.query(
       `SELECT 
-         COALESCE(SUM(CASE WHEN fr.status = 'Paid' THEN fr.amount_paid ELSE 0 END), 0) as collected,
-         COALESCE(SUM(CASE WHEN fr.status IN ('Pending', 'Partial') THEN fr.outstanding ELSE 0 END), 0) as owing,
+         COALESCE(SUM(fr.amount_paid), 0) as collected,
+         COALESCE(SUM(fr.outstanding), 0) as owing,
          COUNT(CASE WHEN fr.is_cleared = true THEN 1 END) as cleared_count,
          COUNT(CASE WHEN fr.status IN ('Pending', 'Partial') THEN 1 END) as owing_count
        FROM fee_records fr

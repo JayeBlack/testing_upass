@@ -31,6 +31,7 @@ exports.getByStudent = async (req, res) => {
 // GET /api/fees (all — admin/accountant)
 exports.getAll = async (req, res) => {
   try {
+    console.log(`[Get All Fees] Request from user: ${req.user?.email}, role: ${req.user?.role}`);
     const { department, status, search } = req.query;
     let sql = `
       SELECT f.*, s.index_number, u.first_name, u.last_name, d.name AS department_name, p.name AS program_name
@@ -52,8 +53,10 @@ exports.getAll = async (req, res) => {
     }
     sql += " ORDER BY u.last_name";
     const result = await db.query(sql, params);
+    console.log(`[Get All Fees] Found ${result.rows.length} fee records`);
     res.json(result.rows);
   } catch (err) {
+    console.error(`[Get All Fees] Error:`, err.message);
     res.status(500).json({ error: err.message });
   }
 };
@@ -107,15 +110,18 @@ exports.toggleClearance = async (req, res) => {
 exports.getSummary = async (req, res) => {
   try {
     const { academic_year, department } = req.query;
+    console.log(`[Fee Summary] Request from user: ${req.user?.email}, role: ${req.user?.role}`);
+    console.log(`[Fee Summary] Filters - academic_year: ${academic_year}, department: ${department}`);
+    
     let sql = `
       SELECT
-        COUNT(*) AS total_students,
-        COALESCE(SUM(total_amount), 0) AS total_fees,
-        COALESCE(SUM(amount_paid), 0) AS total_paid,
-        COALESCE(SUM(total_amount - amount_paid), 0) AS total_outstanding,
-        COUNT(*) FILTER (WHERE is_cleared) AS cleared_count,
-        COUNT(*) FILTER (WHERE NOT is_cleared) AS owing_count,
-        ROUND(COUNT(*) FILTER (WHERE is_cleared) * 100.0 / NULLIF(COUNT(*), 0), 1) AS compliance_rate
+        COUNT(*)::INTEGER AS total_students,
+        COALESCE(SUM(total_amount), 0)::NUMERIC AS total_fees,
+        COALESCE(SUM(amount_paid), 0)::NUMERIC AS total_paid,
+        COALESCE(SUM(total_amount - amount_paid), 0)::NUMERIC AS total_outstanding,
+        COUNT(*) FILTER (WHERE is_cleared)::INTEGER AS cleared_count,
+        COUNT(*) FILTER (WHERE NOT is_cleared)::INTEGER AS owing_count,
+        COALESCE(ROUND(COUNT(*) FILTER (WHERE is_cleared) * 100.0 / NULLIF(COUNT(*), 0), 1), 0)::NUMERIC AS compliance_rate
       FROM fee_records f
       JOIN students s ON f.student_id = s.id
       LEFT JOIN departments d ON s.department_id = d.id
@@ -127,8 +133,23 @@ exports.getSummary = async (req, res) => {
     if (department) { sql += ` AND d.name = $${idx++}`; params.push(department); }
 
     const result = await db.query(sql, params);
-    res.json(result.rows[0]);
+    const summary = result.rows[0];
+    
+    // Convert all values to actual numbers
+    const response = {
+      total_students: parseInt(summary.total_students) || 0,
+      total_fees: parseFloat(summary.total_fees) || 0,
+      total_paid: parseFloat(summary.total_paid) || 0,
+      total_outstanding: parseFloat(summary.total_outstanding) || 0,
+      cleared_count: parseInt(summary.cleared_count) || 0,
+      owing_count: parseInt(summary.owing_count) || 0,
+      compliance_rate: parseFloat(summary.compliance_rate) || 0
+    };
+    
+    console.log(`[Fee Summary] Query result:`, response);
+    res.json(response);
   } catch (err) {
+    console.error(`[Fee Summary] Error:`, err.message);
     res.status(500).json({ error: err.message });
   }
 };

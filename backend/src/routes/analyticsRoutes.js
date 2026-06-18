@@ -5,7 +5,7 @@ const { authenticate, authorize } = require("../middleware/auth");
 router.use(authenticate);
 
 // All analytics endpoints require admin-level access
-const adminRoles = ["Admin", "Dean", "ViceDean", "ExamsOfficer", "Registrar"];
+const adminRoles = ["Admin", "Dean", "ViceDean", "ExamsOfficer", "Registrar", "AdminAssistant"];
 
 router.get("/overview", authorize(...adminRoles), ctrl.getOverview);
 router.get("/enrollment-by-dept", authorize(...adminRoles), ctrl.getEnrollmentByDept);

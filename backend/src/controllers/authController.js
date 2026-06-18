@@ -115,6 +115,16 @@ exports.login = async (req, res) => {
         userResponse.department_name = supervisorData.department_name;
         userResponse.department = supervisorData.department_name;
       }
+    } else if (user.department_id) {
+      // For other staff roles with departments (Admin, Registrar, etc.)
+      const d = await db.query(
+        "SELECT name FROM departments WHERE id = $1",
+        [user.department_id]
+      );
+      if (d.rows.length > 0) {
+        userResponse.department = d.rows[0].name;
+        userResponse.department_name = d.rows[0].name;
+      }
     }
 
     res.json({ token, user: userResponse });
@@ -185,6 +195,16 @@ exports.me = async (req, res) => {
         userResponse.department_name = supervisorData.department_name;
         userResponse.department = supervisorData.department_name;
       }
+    } else if (u.department_id) {
+      // For other staff roles with departments (Admin, Registrar, etc.)
+      const d = await db.query(
+        "SELECT name FROM departments WHERE id = $1",
+        [u.department_id]
+      );
+      if (d.rows.length > 0) {
+        userResponse.department = d.rows[0].name;
+        userResponse.department_name = d.rows[0].name;
+      }
     }
 
     res.json(userResponse);
@@ -222,31 +242,93 @@ exports.changePassword = async (req, res) => {
 // body: { user_id }  → resets to student's index number, or staff email local-part
 exports.adminResetPassword = async (req, res) => {
   try {
+    console.log('=== ADMIN RESET PASSWORD DEBUG ===');
+    console.log('Request user:', req.user);
+    console.log('Is super admin?', req.user?.is_super_admin);
+    console.log('Request body:', req.body);
+    
     if (!req.user?.is_super_admin) {
+      console.log('ERROR: User is not super admin');
       return res.status(403).json({ error: "Super-admin only" });
     }
     const { user_id } = req.body;
-    if (!user_id) return res.status(400).json({ error: "user_id required" });
+    console.log('Received user_id:', user_id, 'Type:', typeof user_id);
+    
+    if (!user_id) {
+      console.log('ERROR: No user_id provided');
+      return res.status(400).json({ error: "user_id required" });
+    }
 
     const u = await db.query("SELECT id, email, role FROM users WHERE id = $1", [user_id]);
-    if (u.rows.length === 0) return res.status(404).json({ error: "User not found" });
+    console.log('User query result:', u.rows);
+    
+    if (u.rows.length === 0) {
+      console.log('ERROR: User not found with id:', user_id);
+      return res.status(404).json({ error: "User not found" });
+    }
     const target = u.rows[0];
+    console.log('Target user:', target);
 
     let defaultPwd;
     if (target.role === "Student") {
       const s = await db.query("SELECT index_number FROM students WHERE user_id = $1", [user_id]);
       defaultPwd = s.rows[0]?.index_number || target.email.split("@")[0];
+      console.log('Student password (index or email prefix):', defaultPwd);
     } else {
       defaultPwd = target.email.split("@")[0];
+      console.log('Staff password (email prefix):', defaultPwd);
     }
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(defaultPwd, salt);
+    
+    console.log('Updating password for user_id:', user_id);
     await db.query(
       "UPDATE users SET password_hash = $1, must_change_password = TRUE, updated_at = NOW() WHERE id = $2",
       [hash, user_id]
     );
+    
+    console.log('Password reset successful');
+    console.log('=== END RESET PASSWORD DEBUG ===\n');
+    
     res.json({ message: "Password reset", default_password: defaultPwd });
+  } catch (err) {
+    console.error('RESET PASSWORD ERROR:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/auth/admin/set-password  (super-admin only)
+// body: { user_id, new_password }  → sets custom password for any user
+exports.adminSetPassword = async (req, res) => {
+  try {
+    if (!req.user?.is_super_admin) {
+      return res.status(403).json({ error: "Super-admin only" });
+    }
+    const { user_id, new_password } = req.body;
+    
+    if (!user_id || !new_password) {
+      return res.status(400).json({ error: "user_id and new_password required" });
+    }
+    
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters" });
+    }
+
+    const u = await db.query("SELECT id, email FROM users WHERE id = $1", [user_id]);
+    if (u.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(new_password, salt);
+    
+    await db.query(
+      "UPDATE users SET password_hash = $1, must_change_password = TRUE, updated_at = NOW() WHERE id = $2",
+      [hash, user_id]
+    );
+    
+    res.json({ message: "Password updated successfully" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -259,7 +341,14 @@ exports.adminCreateStaff = async (req, res) => {
     if (!req.user?.is_super_admin) {
       return res.status(403).json({ error: "Super-admin only" });
     }
-    const { email, first_name, last_name, role, phone, department_id, is_super_admin } = req.body;
+    const { email, first_name, last_name, role, phone, department, is_super_admin, title, staff_id, specialization } = req.body;
+    
+    // DEBUG: Log what we received
+    console.log('=== CREATE STAFF DEBUG ===');
+    console.log('Received department:', department);
+    console.log('Received role:', role);
+    console.log('Full body:', JSON.stringify(req.body, null, 2));
+    
     if (!email || !first_name || !last_name || !role) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -270,28 +359,55 @@ exports.adminCreateStaff = async (req, res) => {
     const existing = await db.query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.rows.length > 0) return res.status(409).json({ error: "Email already registered" });
 
+    // Convert department name to department_id
+    let department_id = null;
+    if (department) {
+      console.log('Querying for department:', department);
+      const deptResult = await db.query(
+        "SELECT id FROM departments WHERE LOWER(name) = LOWER($1)",
+        [department]
+      );
+      console.log('Department query result:', deptResult.rows);
+      if (deptResult.rows.length > 0) {
+        department_id = deptResult.rows[0].id;
+        console.log('Found department_id:', department_id);
+      } else {
+        console.log('WARNING: Department not found in database:', department);
+      }
+    } else {
+      console.log('WARNING: No department provided in request');
+    }
+
     const defaultPwd = email.split("@")[0];
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(defaultPwd, salt);
 
+    console.log('Inserting user with department_id:', department_id);
     const result = await db.query(
       `INSERT INTO users (email, password_hash, role, first_name, last_name, phone, department_id, is_super_admin, must_change_password)
        VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, FALSE), TRUE)
        RETURNING id, email, role, first_name, last_name, phone, department_id, is_super_admin, must_change_password, created_at`,
-      [email, hash, role, first_name, last_name, phone || null, department_id || null, is_super_admin]
+      [email, hash, role, first_name, last_name, phone || null, department_id, is_super_admin]
     );
+    console.log('User created with department_id:', result.rows[0].department_id);
 
     // Create supervisor record if role is Supervisor
     if (role === "Supervisor") {
-      const staff_id = email.split('@')[0].toUpperCase();
+      const supervisor_staff_id = staff_id || email.split('@')[0].toUpperCase();
+      const supervisor_title = title || "Dr.";
+      console.log('Creating supervisor record with department_id:', department_id);
       await db.query(
-        "INSERT INTO supervisors (user_id, staff_id, department_id, is_active) VALUES ($1, $2, $3, TRUE)",
-        [result.rows[0].id, staff_id, department_id || null]
+        "INSERT INTO supervisors (user_id, staff_id, title, department_id, specialization, is_active) VALUES ($1, $2, $3, $4, $5, TRUE)",
+        [result.rows[0].id, supervisor_staff_id, supervisor_title, department_id, specialization || null]
       );
+      console.log('Supervisor record created');
     }
+    
+    console.log('=== END CREATE STAFF DEBUG ===\n');
 
     res.status(201).json({ user: result.rows[0], default_password: defaultPwd });
   } catch (err) {
+    console.error('CREATE STAFF ERROR:', err);
     res.status(500).json({ error: err.message });
   }
 };
