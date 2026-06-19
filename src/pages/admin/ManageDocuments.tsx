@@ -9,7 +9,7 @@ interface DocRequest {
   student_id: string;
   doc_type: string;
   purpose: string;
-  status: "Pending" | "Processing" | "Ready";
+  status: "Pending" | "Ready";
   requested_at: string;
   first_name: string;
   last_name: string;
@@ -20,7 +20,6 @@ interface DocRequest {
 
 const statusConfig = {
   Pending: { icon: <Clock size={14} />, className: "bg-muted text-muted-foreground" },
-  Processing: { icon: <Clock size={14} />, className: "bg-warning/10 text-warning" },
   Ready: { icon: <CheckCircle size={14} />, className: "bg-success/10 text-success" },
 };
 
@@ -29,7 +28,7 @@ const ManageDocuments = () => {
   const [requests, setRequests] = useState<DocRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | "Pending" | "Processing" | "Ready">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "Pending" | "Ready">("all");
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -49,7 +48,7 @@ const ManageDocuments = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const updateStatus = async (id: string, status: "Pending" | "Processing" | "Ready") => {
+  const updateStatus = async (id: string, status: "Ready") => {
     setUpdating(id);
     try {
       await apiFetch(`/documents/${id}/status`, { method: "PUT", body: JSON.stringify({ status }) });
@@ -64,7 +63,6 @@ const ManageDocuments = () => {
 
   const filtered = requests.filter((r) => statusFilter === "all" || r.status === statusFilter);
   const pendingCount = requests.filter((r) => r.status === "Pending").length;
-  const processingCount = requests.filter((r) => r.status === "Processing").length;
   const readyCount = requests.filter((r) => r.status === "Ready").length;
 
   return (
@@ -80,19 +78,12 @@ const ManageDocuments = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div className="bg-card rounded-xl border border-border px-5 py-4 flex items-center gap-3">
           <Clock size={20} className="text-muted-foreground" />
           <div>
             <p className="text-2xl font-bold font-display text-foreground">{pendingCount}</p>
             <p className="text-xs text-muted-foreground">Pending</p>
-          </div>
-        </div>
-        <div className="bg-card rounded-xl border border-border px-5 py-4 flex items-center gap-3">
-          <Clock size={20} className="text-warning" />
-          <div>
-            <p className="text-2xl font-bold font-display text-foreground">{processingCount}</p>
-            <p className="text-xs text-muted-foreground">Processing</p>
           </div>
         </div>
         <div className="bg-card rounded-xl border border-border px-5 py-4 flex items-center gap-3">
@@ -106,7 +97,7 @@ const ManageDocuments = () => {
 
       {/* Filter */}
       <div className="flex gap-1 mb-6 bg-muted rounded-lg p-1 w-fit">
-        {(["all", "Pending", "Processing", "Ready"] as const).map((s) => (
+        {(["all", "Pending", "Ready"] as const).map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
@@ -158,16 +149,7 @@ const ManageDocuments = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="inline-flex items-center gap-1">
-                          {r.status === "Pending" && (
-                            <button
-                              onClick={() => updateStatus(r.id, "Processing")}
-                              disabled={updating === r.id}
-                              className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-                            >
-                              {updating === r.id ? <Loader2 size={12} className="animate-spin" /> : "Process"}
-                            </button>
-                          )}
-                          {r.status === "Processing" && (
+                          {r.status === "Pending" ? (
                             <button
                               onClick={() => updateStatus(r.id, "Ready")}
                               disabled={updating === r.id}
@@ -175,8 +157,7 @@ const ManageDocuments = () => {
                             >
                               {updating === r.id ? <Loader2 size={12} className="animate-spin" /> : "Mark Ready"}
                             </button>
-                          )}
-                          {r.status === "Ready" && (
+                          ) : (
                             <span className="text-xs text-success font-medium">Done</span>
                           )}
                         </div>

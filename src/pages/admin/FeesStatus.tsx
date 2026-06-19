@@ -33,6 +33,11 @@ const FeesStatus = () => {
   const { user } = useAuth();
   const { isSuperAdmin, adminDepartment } = useAdminDepartment();
   const isAccountant = user?.role === "Accountant";
+  const isAccountingAssistant = user?.role === "AccountingAssistant";
+  const isRegistrar = user?.role === "Registrar";
+  const isAdminAssistant = user?.role === "AdminAssistant";
+  const isViewOnlyUser = isRegistrar || isAdminAssistant || user?.role === "Dean" || user?.role === "ViceDean" || user?.role === "ExamsOfficer" || user?.role === "Admin";
+  const canModifyFees = isAccountant || isAccountingAssistant;
   const [records, setRecords] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,15 +53,25 @@ const FeesStatus = () => {
 
   useEffect(() => {
     loadFees();
+    // Auto-refresh every 15 seconds for real-time updates
+    const interval = setInterval(loadFees, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadFees = async () => {
     setLoading(true);
     try {
+      console.log(`[FeesStatus] ${user?.role} fetching fees from /api/fees...`);
       const data = await apiFetch<FeeRecord[]>("/fees");
+      console.log(`[FeesStatus] ${user?.role} received ${data?.length || 0} records`);
       setRecords(data || []);
-    } catch {
-      // backend offline
+    } catch (err: any) {
+      console.error(`[FeesStatus] ${user?.role} error:`, err);
+      toast({ 
+        title: "Failed to load fees", 
+        description: err.message || "Check console for details", 
+        variant: "destructive" 
+      });
     } finally {
       setLoading(false);
     }
@@ -153,10 +168,14 @@ const FeesStatus = () => {
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">Students Fees</h1>
           <p className="text-muted-foreground mt-1">
-            {isSuperAdmin ? "Financial clearance for postgraduate students" : `${adminDepartment} — Financial clearance`}
+            {isViewOnlyUser 
+              ? "View-only access to financial records" 
+              : isSuperAdmin 
+              ? "Financial clearance for postgraduate students" 
+              : `${adminDepartment} — Financial clearance`}
           </p>
         </div>
-        {isAccountant && (
+        {canModifyFees && (
           <button
             onClick={() => setShowImport(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
@@ -289,11 +308,19 @@ const FeesStatus = () => {
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground mb-4">Showing {filtered.length} of {records.length} students</p>
+      <p className="text-sm text-muted-foreground mb-4">
+        Showing {filtered.length} of {records.length} students
+        {isViewOnlyUser && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-muted">View Only</span>}
+      </p>
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+              <Loader2 size={18} className="animate-spin mr-2" /> Loading financial records...
+            </div>
+          ) : (
+            <table className="w-full">
             <thead>
               <tr className="border-b border-border">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Student</th>
@@ -329,19 +356,26 @@ const FeesStatus = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleToggleClearance(f.id)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${f.is_cleared ? "border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "gradient-gold text-secondary-foreground hover:opacity-90"}`}>
-                      {f.is_cleared ? "Revoke" : "Clear"}
-                    </button>
+                    {canModifyFees ? (
+                      <button onClick={() => handleToggleClearance(f.id)} className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${f.is_cleared ? "border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30" : "gradient-gold text-secondary-foreground hover:opacity-90"}`}>
+                        {f.is_cleared ? "Revoke" : "Clear"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground px-2">Read only</span>
+                    )}
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+              {filtered.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-muted-foreground">No students match the selected filters</td>
+                  <td colSpan={9} className="px-6 py-12 text-center text-sm text-muted-foreground">
+                    {records.length === 0 ? "No fee records available" : "No students match the selected filters"}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
+          )}
         </div>
       </div>
     </DashboardLayout>

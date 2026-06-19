@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, Navigate } from "react-router-dom";
-import { Lock, KeyRound } from "lucide-react";
+import { Lock, KeyRound, Eye, EyeOff } from "lucide-react";
 import umatLogo from "@/assets/umat-logo.png";
 import SEO from "@/components/SEO";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,9 @@ const ChangePassword = () => {
   const [oldPwd, setOldPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showOldPwd, setShowOldPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   if (!user) return <Navigate to="/" replace />;
@@ -63,9 +66,9 @@ const ChangePassword = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Field label="Current password" value={oldPwd} onChange={setOldPwd} />
-          <Field label="New password" value={newPwd} onChange={setNewPwd} />
-          <Field label="Confirm new password" value={confirm} onChange={setConfirm} />
+          <Field label="Current password" value={oldPwd} onChange={setOldPwd} show={showOldPwd} onToggle={() => setShowOldPwd(!showOldPwd)} />
+          <Field label="New password" value={newPwd} onChange={setNewPwd} show={showNewPwd} onToggle={() => setShowNewPwd(!showNewPwd)} />
+          <Field label="Confirm new password" value={confirm} onChange={setConfirm} show={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
 
           <button
             type="submit"
@@ -87,18 +90,25 @@ const ChangePassword = () => {
   );
 };
 
-const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
+const Field = ({ label, value, onChange, show, onToggle }: { label: string; value: string; onChange: (v: string) => void; show: boolean; onToggle: () => void }) => (
   <div>
     <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
     <div className="relative">
       <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
       <input
-        type="password"
+        type={show ? "text" : "password"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="••••••••"
-        className="w-full pl-11 pr-4 py-3 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        className="w-full pl-11 pr-11 py-3 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
     </div>
   </div>
 );

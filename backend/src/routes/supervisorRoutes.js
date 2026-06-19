@@ -11,12 +11,12 @@ const setResourceSubdir = (req, res, next) => {
 router.use(authenticate);
 router.get("/current/stats", ctrl.getDashboardStats);
 router.get("/current/submissions", ctrl.getCurrentSupervisorSubmissions);
-router.get("/", ctrl.getAll);
-router.get("/assignments", ctrl.getAllAssignments);
-router.get("/:id", ctrl.getById);
-router.get("/:id/students", ctrl.getAssignedStudents);
-router.post("/:id/assign", ctrl.assignStudent);
-router.delete("/assignments/:assignmentId", ctrl.unassignStudent);
+router.get("/", authorize("Admin", "Dean", "ViceDean", "Registrar"), ctrl.getAll);
+router.get("/assignments", authorize("Admin", "Dean", "ViceDean", "Registrar"), ctrl.getAllAssignments);
+router.get("/:id", authorize("Admin", "Dean", "ViceDean", "Registrar"), ctrl.getById);
+router.get("/:id/students", authorize("Admin", "Dean", "ViceDean", "Registrar", "Supervisor"), ctrl.getAssignedStudents);
+router.post("/:id/assign", authorize("Admin"), ctrl.assignStudent);
+router.delete("/assignments/:assignmentId", authorize("Admin"), ctrl.unassignStudent);
 
 // Resource and announcement endpoints
 router.post("/resources/upload", authorize("Supervisor"), setResourceSubdir, upload.single("file"), ctrl.uploadResource);

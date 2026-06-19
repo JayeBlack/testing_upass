@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiFetch, ApiError } from "@/lib/api";
 
 type DocType = "Recommendation Letter" | "Attestation Letter" | "Transcript (Certified)" | "Letter of Good Standing" | "Other";
-type RequestStatus = "Pending" | "Processing" | "Ready";
+type RequestStatus = "Pending" | "Ready";
 
 interface DocRequest {
   id: string;
@@ -34,7 +34,6 @@ interface SemesterGroup {
 
 const statusConfig: Record<RequestStatus, { icon: React.ReactNode; className: string }> = {
   Pending: { icon: <Clock size={14} />, className: "bg-muted text-muted-foreground" },
-  Processing: { icon: <Clock size={14} />, className: "bg-warning/10 text-warning" },
   Ready: { icon: <CheckCircle size={14} />, className: "bg-success/10 text-success" },
 };
 
@@ -62,10 +61,23 @@ const DocumentRequests = () => {
   // resolve student record once — only for Student role
   useEffect(() => {
     if (!user || user.role !== "Student") return;
-    apiFetch<any[]>("/students").then((data) => {
-      const me = data.find((s: any) => String(s.user_id) === String(user.id));
-      if (me) setStudentId(String(me.id));
-    }).catch(() => {});
+    apiFetch<any>("/students/me").then((data) => {
+      if (data && data.id) {
+        setStudentId(String(data.id));
+      } else {
+        toast({ 
+          title: "Student record not found", 
+          description: "Unable to find your student record. Contact administrator.", 
+          variant: "destructive" 
+        });
+      }
+    }).catch((err) => {
+      toast({ 
+        title: "Error loading student data", 
+        description: err instanceof ApiError ? err.message : "Cannot connect to server", 
+        variant: "destructive" 
+      });
+    });
   }, [user?.id]);
 
   const loadRequests = async (silent = false) => {
@@ -98,25 +110,37 @@ const DocumentRequests = () => {
     if (!studentId) return;
     loadRequests();
     loadTranscript();
-    const interval = setInterval(() => loadRequests(true), 30000);
+    const interval = setInterval(() => loadRequests(true), 5000); // Poll every 5 seconds for real-time updates
     return () => clearInterval(interval);
   }, [studentId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentId) return;
+    if (!studentId) {
+      toast({ 
+        title: "Cannot submit request", 
+        description: "Student ID not found. Please refresh the page.", 
+        variant: "destructive" 
+      });
+      return;
+    }
     setSubmitting(true);
     try {
-      await apiFetch("/documents", {
+      const response = await apiFetch("/documents", {
         method: "POST",
         body: JSON.stringify({ student_id: studentId, doc_type: formData.type, purpose: formData.purpose }),
       });
-      toast({ title: "Request submitted", description: `${formData.type} request has been submitted.` });
+      toast({ title: "Request submitted", description: `${formData.type} request has been submitted successfully.` });
       setFormData({ type: docTypes[0], purpose: "" });
       setShowForm(false);
-      loadRequests();
+      await loadRequests();
     } catch (err) {
-      toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
+      console.error("Document request error:", err);
+      toast({ 
+        title: "Failed to submit request", 
+        description: err instanceof ApiError ? err.message : "An error occurred. Please try again.", 
+        variant: "destructive" 
+      });
     } finally {
       setSubmitting(false);
     }
@@ -162,12 +186,20 @@ const DocumentRequests = () => {
           <div className="flex justify-end mb-6">
             <button
               onClick={() => setShowForm(!showForm)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity"
+              disabled={!studentId}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {showForm ? <X size={16} /> : <Plus size={16} />}
               {showForm ? "Cancel" : "New Request"}
             </button>
           </div>
+
+          {!studentId && (
+            <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 mb-6 flex items-center gap-3">
+              <Loader2 size={18} className="animate-spin text-warning" />
+              <p className="text-sm text-foreground">Loading your student information...</p>
+            </div>
+          )}
 
           {showForm && (
             <form onSubmit={handleSubmit} className="bg-card rounded-xl border border-border p-6 mb-6 space-y-4">
@@ -198,9 +230,13 @@ const DocumentRequests = () => {
                 <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="px-5 py-2 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center gap-2">
+                <button 
+                  type="submit" 
+                  disabled={submitting || !studentId || !formData.purpose.trim()} 
+                  className="px-5 py-2 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+                >
                   {submitting && <Loader2 size={14} className="animate-spin" />}
-                  Submit Request
+                  {submitting ? "Submitting..." : "Submit Request"}
                 </button>
               </div>
             </form>
@@ -234,6 +270,7 @@ const DocumentRequests = () => {
                     <tbody>
                       {requests.map((r) => {
                         const cfg = statusConfig[r.status] ?? statusConfig.Pending;
+                        const hasDownload = r.status === "Ready" && (r as any).file_url;
                         return (
                           <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
                             <td className="px-6 py-4 text-sm font-mono font-medium text-foreground">#{r.id}</td>
@@ -241,9 +278,21 @@ const DocumentRequests = () => {
                             <td className="px-6 py-4 text-sm text-muted-foreground">{r.purpose}</td>
                             <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(r.requested_at).toLocaleDateString()}</td>
                             <td className="px-6 py-4 text-center">
-                              <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
-                                {cfg.icon}{r.status}
-                              </span>
+                              {hasDownload ? (
+                                <a
+                                  href={(r as any).file_url}
+                                  download
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full gradient-gold text-secondary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+                                >
+                                  <Download size={12} /> Download
+                                </a>
+                              ) : (
+                                <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full ${cfg.className}`}>
+                                  {cfg.icon}{r.status}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         );

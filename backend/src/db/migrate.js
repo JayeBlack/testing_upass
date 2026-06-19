@@ -14,20 +14,39 @@ async function migrate() {
 
   console.log(`Found ${files.length} migration(s)...\n`);
 
+  let successCount = 0;
+  let errorCount = 0;
+
   for (const file of files) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), "utf-8");
     console.log(`▶ Running ${file}...`);
     try {
       await db.query(sql);
       console.log(`  ✓ ${file} applied successfully`);
+      successCount++;
     } catch (err) {
-      console.error(`  ✗ ${file} failed:`, err.message);
-      process.exit(1);
+      // Check if error is because object already exists
+      if (err.message.includes("already exists") || err.message.includes("does not exist")) {
+        console.log(`  ⚠ ${file} skipped: ${err.message}`);
+      } else {
+        console.error(`  ✗ ${file} failed:`, err.message);
+        errorCount++;
+      }
     }
   }
 
-  console.log("\n✅ All migrations applied successfully!");
-  process.exit(0);
+  console.log(`\n📊 Migration Summary:`);
+  console.log(`   ✓ Success: ${successCount}`);
+  console.log(`   ⚠ Skipped: ${files.length - successCount - errorCount}`);
+  console.log(`   ✗ Failed: ${errorCount}`);
+  
+  if (errorCount === 0) {
+    console.log("\n✅ All migrations completed!");
+  } else {
+    console.log("\n⚠️  Some migrations failed. Check errors above.");
+  }
+  
+  process.exit(errorCount > 0 ? 1 : 0);
 }
 
 migrate();

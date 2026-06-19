@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS fee_records (
 
 CREATE TABLE IF NOT EXISTS payments (
   id              SERIAL PRIMARY KEY,
-  fee_record_id   INTEGER REFERENCES fee_records(id) ON DELETE CASCADE,
+  fee_record_id   INTEGER UNIQUE REFERENCES fee_records(id) ON DELETE CASCADE,
   amount          NUMERIC(10,2) NOT NULL,
   payment_method  VARCHAR(50),    -- MTN MoMo, Vodafone Cash, Bank Card, Bank Transfer
   reference       VARCHAR(100),

@@ -15,6 +15,28 @@ function generateProgramCode(name) {
   return code || "PROG";
 }
 
+// GET /api/students/me - Get current user's student profile
+exports.getMyProfile = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT s.*, u.first_name, u.last_name, u.email, u.avatar_url,
+              p.name AS program_name, d.name AS department_name
+       FROM students s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN programs p ON s.program_id = p.id
+       LEFT JOIN departments d ON s.department_id = d.id
+       WHERE s.user_id = $1`,
+      [req.user.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Student profile not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // GET /api/students
 exports.getAll = async (req, res) => {
   try {

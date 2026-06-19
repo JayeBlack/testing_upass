@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ChangePassword from "./pages/ChangePassword";
 import RequireAuth from "./components/RequireAuth";
+import RoleGuard from "./components/RoleGuard";
 import CourseRegistration from "./pages/student/CourseRegistration";
 import ThesisUpload from "./pages/student/ThesisUpload";
 import Results from "./pages/student/Results";
@@ -57,41 +58,41 @@ const App = () => (
             <Route path="/change-password" element={<RequireAuth><ChangePassword /></RequireAuth>} />
             <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
             {/* Student */}
-            <Route path="/courses/register" element={<RequireAuth><CourseRegistration /></RequireAuth>} />
-            <Route path="/thesis/upload" element={<RequireAuth><ThesisUpload /></RequireAuth>} />
-            <Route path="/results" element={<RequireAuth><Results /></RequireAuth>} />
-            <Route path="/finances" element={<RequireAuth><FinancialStatus /></RequireAuth>} />
-            <Route path="/transcript" element={<RequireAuth><DocumentRequests /></RequireAuth>} />
-            <Route path="/documents" element={<RequireAuth><DocumentRequests /></RequireAuth>} />
-            <Route path="/clearance" element={<RequireAuth><Clearance /></RequireAuth>} />
-            <Route path="/student/chat" element={<RequireAuth><ChatAssistant /></RequireAuth>} />
-            <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
+            <Route path="/courses/register" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><CourseRegistration /></RoleGuard></RequireAuth>} />
+            <Route path="/thesis/upload" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><ThesisUpload /></RoleGuard></RequireAuth>} />
+            <Route path="/results" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><Results /></RoleGuard></RequireAuth>} />
+            <Route path="/finances" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><FinancialStatus /></RoleGuard></RequireAuth>} />
+            <Route path="/transcript" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><DocumentRequests /></RoleGuard></RequireAuth>} />
+            <Route path="/documents" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><DocumentRequests /></RoleGuard></RequireAuth>} />
+            <Route path="/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><Clearance /></RoleGuard></RequireAuth>} />
+            <Route path="/student/chat" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><ChatAssistant /></RoleGuard></RequireAuth>} />
+            <Route path="/notifications" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><Notifications /></RoleGuard></RequireAuth>} />
             {/* Supervisor */}
-            <Route path="/students" element={<RequireAuth><AssignedStudents /></RequireAuth>} />
-            <Route path="/submissions" element={<RequireAuth><ReviewSubmissions /></RequireAuth>} />
-            <Route path="/supervisor/templates" element={<RequireAuth><TemplatesAnnouncements /></RequireAuth>} />
-            <Route path="/supervisor/ai" element={<RequireAuth><AIAssistant /></RequireAuth>} />
-            {/* Admin */}
-            <Route path="/admin/students" element={<RequireAuth><ManageStudents /></RequireAuth>} />
-            <Route path="/admin/fees" element={<RequireAuth><FeesStatus /></RequireAuth>} />
-            <Route path="/admin/passlist" element={<RequireAuth><PassList /></RequireAuth>} />
-            <Route path="/admin/analytics" element={<RequireAuth><Analytics /></RequireAuth>} />
-            <Route path="/admin/log" element={<RequireAuth><SystemLog /></RequireAuth>} />
-            <Route path="/admin/documents" element={<RequireAuth><ManageDocuments /></RequireAuth>} />
-            <Route path="/admin/users" element={<RequireAuth><ManageUsers /></RequireAuth>} />
-            <Route path="/admin/assignments" element={<RequireAuth><SupervisorAssignments /></RequireAuth>} />
+            <Route path="/students" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><AssignedStudents /></RoleGuard></RequireAuth>} />
+            <Route path="/submissions" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><ReviewSubmissions /></RoleGuard></RequireAuth>} />
+            <Route path="/supervisor/templates" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><TemplatesAnnouncements /></RoleGuard></RequireAuth>} />
+            <Route path="/supervisor/ai" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><AIAssistant /></RoleGuard></RequireAuth>} />
+            {/* Admin - Shared with multiple roles */}
+            <Route path="/admin/students" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer"]}><ManageStudents /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/fees" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Accountant", "AccountingAssistant", "Dean", "ViceDean", "ExamsOfficer", "Registrar", "AdminAssistant"]}><FeesStatus /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/passlist" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer"]}><PassList /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/analytics" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "ExamsOfficer"]}><Analytics /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/log" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><SystemLog /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/documents" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant"]}><ManageDocuments /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/users" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><ManageUsers /></RoleGuard></RequireAuth>} />
+            <Route path="/admin/assignments" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><SupervisorAssignments /></RoleGuard></RequireAuth>} />
             {/* Dean */}
-            <Route path="/dean/clearance" element={<RequireAuth><ClearanceApprovals /></RequireAuth>} />
-            <Route path="/dean/results" element={<RequireAuth><CWAResults /></RequireAuth>} />
-            <Route path="/dean/documents" element={<RequireAuth><DeanDocuments /></RequireAuth>} />
+            <Route path="/dean/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><ClearanceApprovals /></RoleGuard></RequireAuth>} />
+            <Route path="/dean/results" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><CWAResults /></RoleGuard></RequireAuth>} />
+            <Route path="/dean/documents" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><DeanDocuments /></RoleGuard></RequireAuth>} />
             {/* Accountant */}
-            <Route path="/accountant/analytics" element={<RequireAuth><FeeAnalytics /></RequireAuth>} />
-            <Route path="/accountant/reports" element={<RequireAuth><ExportReports /></RequireAuth>} />
-            <Route path="/accountant/announcements" element={<RequireAuth><FeeAnnouncements /></RequireAuth>} />
+            <Route path="/accountant/analytics" element={<RequireAuth><RoleGuard allowedRoles={["Accountant", "AccountingAssistant"]}><FeeAnalytics /></RoleGuard></RequireAuth>} />
+            <Route path="/accountant/reports" element={<RequireAuth><RoleGuard allowedRoles={["Accountant", "AccountingAssistant"]}><ExportReports /></RoleGuard></RequireAuth>} />
+            <Route path="/accountant/announcements" element={<RequireAuth><RoleGuard allowedRoles={["Accountant", "AdminAssistant"]}><FeeAnnouncements /></RoleGuard></RequireAuth>} />
             {/* Exams Officer */}
-            <Route path="/exams/grades" element={<RequireAuth><GradeEntry /></RequireAuth>} />
-            <Route path="/exams/passlist" element={<RequireAuth><GeneratePassList /></RequireAuth>} />
-            <Route path="/exams/publish" element={<RequireAuth><PublishResults /></RequireAuth>} />
+            <Route path="/exams/grades" element={<RequireAuth><RoleGuard allowedRoles={["ExamsOfficer"]}><GradeEntry /></RoleGuard></RequireAuth>} />
+            <Route path="/exams/passlist" element={<RequireAuth><RoleGuard allowedRoles={["ExamsOfficer"]}><GeneratePassList /></RoleGuard></RequireAuth>} />
+            <Route path="/exams/publish" element={<RequireAuth><RoleGuard allowedRoles={["ExamsOfficer"]}><PublishResults /></RoleGuard></RequireAuth>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

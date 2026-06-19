@@ -1,6 +1,6 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Banknote, CheckCircle, AlertCircle, Clock, Upload, Download, Loader2 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Banknote, CheckCircle, AlertCircle, Clock, Download, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import umatLogo from "@/assets/umat-logo.png";
 import { useAuth } from "@/contexts/AuthContext";
@@ -17,8 +17,15 @@ interface FeeRecord {
   is_cleared: boolean;
 }
 
-const formatCurrency = (amount: number) => `GHS ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-const formatCurrencyDisplay = (amount: number) => `GH\u20B5 ${amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+const formatCurrency = (amount: number) => {
+  const num = parseFloat(String(amount));
+  return `GHS ${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const formatCurrencyDisplay = (amount: number) => {
+  const num = parseFloat(String(amount));
+  return `GH₵ ${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 const statusConfig: Record<string, { icon: React.ReactNode; className: string }> = {
   Paid: { icon: <CheckCircle size={14} />, className: "bg-success/10 text-success" },
@@ -31,15 +38,6 @@ const FinancialStatus = () => {
   const { user } = useAuth();
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPayModal, setShowPayModal] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  // Payment form state
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [paymentFile, setPaymentFile] = useState<File | null>(null);
-  const [selectedFeeId, setSelectedFeeId] = useState<string>("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadFees = () => {
     if (!user?.id) return;
@@ -53,73 +51,9 @@ const FinancialStatus = () => {
     loadFees();
   }, [user?.id]);
 
-  // Re-fetch after payment
-  useEffect(() => {
-    if (!showPayModal) {
-      // Reset form when modal closes
-      setPaymentAmount("");
-      setPaymentReference("");
-      setPaymentFile(null);
-      setSelectedFeeId("");
-    }
-  }, [showPayModal]);
-
   const totalAmount = fees.reduce((sum, f) => sum + Number(f.total_amount), 0);
   const totalPaid = fees.reduce((sum, f) => sum + Number(f.amount_paid), 0);
   const totalOwed = fees.reduce((sum, f) => sum + (Number(f.total_amount) - Number(f.amount_paid)), 0);
-
-  const handleSubmitPayment = async () => {
-    if (!paymentAmount || Number(paymentAmount) <= 0) {
-      toast({ title: "Invalid amount", description: "Enter a valid payment amount", variant: "destructive" });
-      return;
-    }
-    if (!paymentReference.trim()) {
-      toast({ title: "Reference required", description: "Enter the transaction reference number", variant: "destructive" });
-      return;
-    }
-    if (!selectedFeeId) {
-      toast({ title: "Select a fee record", description: "Choose which fee record this payment applies to", variant: "destructive" });
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      let receiptUrl = "";
-
-      // Upload receipt file if provided
-      if (paymentFile) {
-        const formData = new FormData();
-        formData.append("file", paymentFile);
-        // We'll store the receipt URL as a placeholder since Supabase storage may not be configured for this
-        // For now, we store the filename as reference
-        receiptUrl = `receipt_${Date.now()}_${paymentFile.name}`;
-      }
-
-      await apiFetch("/fees/payment", {
-        method: "POST",
-        body: JSON.stringify({
-          fee_record_id: selectedFeeId,
-          amount: Number(paymentAmount),
-          payment_method: "bank_transfer",
-          reference: paymentReference.trim(),
-          receipt_url: receiptUrl,
-        }),
-      });
-
-      toast({ title: "Payment submitted", description: "Your payment receipt has been submitted for verification" });
-      setShowPayModal(false);
-
-      // Re-fetch fee data
-      setTimeout(() => loadFees(), 500);
-    } catch (err: any) {
-      toast({ title: "Payment failed", description: err.message || "Could not submit payment", variant: "destructive" });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Auto-select the fee with outstanding balance
-  const unpaidFees = fees.filter((f) => Number(f.total_amount) - Number(f.amount_paid) > 0);
 
   const handleDownloadReceipt = async (fee: FeeRecord) => {
     try {
@@ -293,126 +227,8 @@ const FinancialStatus = () => {
 
       {totalOwed > 0 && (
         <div className="bg-card rounded-xl border border-border p-5 mb-8">
-          <h2 className="font-display text-lg font-bold text-foreground mb-3">Make a Payment</h2>
-          <p className="text-sm text-muted-foreground mb-4">Pay via bank transfer or deposit to the UMaT School of Postgraduate Studies bank account and upload your payment receipt for verification.</p>
-          <div className="bg-muted/50 rounded-xl p-4 mb-4 border border-border">
-            <h3 className="text-sm font-semibold text-foreground mb-2">Bank Payment Details</h3>
-            <p className="text-xs text-muted-foreground">Bank: Consolidated Bank Ghana (CBG)</p>
-            <p className="text-xs text-muted-foreground">Account Name: UMaT School of Postgraduate Studies</p>
-            <p className="text-xs text-muted-foreground">Account Number: 1234567890123</p>
-            <p className="text-xs text-muted-foreground">Branch: Tarkwa Main</p>
-          </div>
-          <button
-            onClick={() => setShowPayModal(true)}
-            className="flex items-center gap-3 p-4 rounded-xl border border-border hover:border-secondary/50 hover:bg-secondary/5 transition-all text-left w-full"
-          >
-            <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
-              <Upload size={18} className="text-info" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">Upload Bank Payment Receipt</p>
-              <p className="text-xs text-muted-foreground">Bank deposit or transfer proof for verification</p>
-            </div>
-          </button>
-        </div>
-      )}
-
-      {showPayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setShowPayModal(false)}>
-          <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-display text-lg font-bold text-foreground mb-1">Upload Bank Payment Receipt</h3>
-            <p className="text-sm text-muted-foreground mb-5">Upload a photo or scan of your bank payment receipt for verification. Ensure the bank teller or transfer confirmation clearly shows the amount and transaction reference.</p>
-            <div className="space-y-4">
-              {unpaidFees.length > 1 && (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Select Fee Record</label>
-                  <select
-                    value={selectedFeeId}
-                    onChange={(e) => {
-                      setSelectedFeeId(e.target.value);
-                      const fee = unpaidFees.find((f) => f.id === e.target.value);
-                      if (fee) setPaymentAmount(String(Number(fee.total_amount) - Number(fee.amount_paid)));
-                    }}
-                    className="w-full mt-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none"
-                  >
-                    <option value="">Select a fee record</option>
-                    {unpaidFees.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.academic_year} — {f.semester} (Balance: GH₵{(Number(f.total_amount) - Number(f.amount_paid)).toLocaleString()})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {unpaidFees.length === 1 && (
-                <input type="hidden" value={selectedFeeId || unpaidFees[0].id} readOnly />
-              )}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Amount Paid (GH₵)</label>
-                <input
-                  type="number"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full mt-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Transaction Reference</label>
-                <input
-                  type="text"
-                  value={paymentReference}
-                  onChange={(e) => setPaymentReference(e.target.value)}
-                  placeholder="e.g. TXN-123456 or Teller Number"
-                  className="w-full mt-1 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Receipt Upload (optional)</label>
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-border rounded-xl p-6 text-center cursor-pointer hover:border-secondary/50 transition-colors mt-1"
-                >
-                  <Upload size={24} className="mx-auto text-muted-foreground mb-2" />
-                  {paymentFile ? (
-                    <p className="text-sm text-foreground font-medium">{paymentFile.name}</p>
-                  ) : (
-                    <>
-                      <p className="text-sm text-muted-foreground">Click to upload receipt</p>
-                      <p className="text-xs text-muted-foreground/60 mt-1">PDF, JPG, PNG (max 5MB)</p>
-                    </>
-                  )}
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      if (file.size > 5 * 1024 * 1024) {
-                        toast({ title: "File too large", description: "Receipt must be under 5MB", variant: "destructive" });
-                        return;
-                      }
-                      setPaymentFile(file);
-                    }
-                  }}
-                />
-              </div>
-              <button
-                onClick={handleSubmitPayment}
-                disabled={submitting}
-                className="w-full py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {submitting && <Loader2 size={14} className="animate-spin" />}
-                {submitting ? "Submitting..." : "Submit for Verification"}
-              </button>
-            </div>
-            <button onClick={() => setShowPayModal(false)} className="w-full mt-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Cancel
-            </button>
-          </div>
+          <h2 className="font-display text-lg font-bold text-foreground mb-3">Outstanding Balance</h2>
+          <p className="text-sm text-muted-foreground">You have an outstanding balance. Please contact the Finance Office at the School of Postgraduate Studies to make payment arrangements.</p>
         </div>
       )}
 

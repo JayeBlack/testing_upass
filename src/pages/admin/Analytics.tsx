@@ -135,8 +135,10 @@ const Analytics = () => {
   const [programBreakdown, setProgramBreakdown] = useState<ProgramBreakdown[]>([]);
   const [enrollmentTrend, setEnrollmentTrend] = useState<EnrollmentTrend[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [counts, setCounts] = useState({ departments: 0, programs: 0 });
 
-  const isSuperAdmin = user?.isSuperAdmin || user?.role === "Admin";
+  const isSuperAdmin = user?.isSuperAdmin || user?.role === "Admin" || user?.role === "Dean" || user?.role === "ViceDean";
+  const isDean = user?.role === "Dean" || user?.role === "ViceDean";
   const department = isSuperAdmin ? "all" : user?.department;
 
   const loadAllData = async () => {
@@ -144,6 +146,12 @@ const Analytics = () => {
     try {
       const deptParam = department && department !== "all" ? `?department=${department}` : "";
       
+      // Fetch each endpoint individually so one failure doesn't cascade and wipe all data
+      async function fetchSafe<T>(url: string): Promise<T | null> {
+        try { return await apiFetch<T>(url); }
+        catch { return null; }
+      }
+
       const [
         overviewData,
         enrollmentData,
@@ -152,26 +160,29 @@ const Analytics = () => {
         cwaData,
         programData,
         trendData,
+        countsData,
         alertsData,
       ] = await Promise.all([
-        apiFetch<OverviewData>(`/analytics/overview${deptParam}`),
-        apiFetch<EnrollmentByDept[]>(`/analytics/enrollment-by-dept${deptParam}`),
-        apiFetch<FeesTrend[]>(`/analytics/fees-trend${deptParam}`),
-        apiFetch<ThesisProgress[]>(`/analytics/thesis-progress${deptParam}`),
-        apiFetch<CWADistribution[]>(`/analytics/cwa-distribution${deptParam}`),
-        apiFetch<ProgramBreakdown[]>(`/analytics/program-breakdown${deptParam}`),
-        apiFetch<EnrollmentTrend[]>(`/analytics/enrollment-trend${deptParam}`),
-        apiFetch<Alert[]>(`/analytics/alerts${deptParam}`),
+        fetchSafe<OverviewData>(`/analytics/overview${deptParam}`),
+        fetchSafe<EnrollmentByDept[]>(`/analytics/enrollment-by-dept${deptParam}`),
+        fetchSafe<FeesTrend[]>(`/analytics/fees-trend${deptParam}`),
+        fetchSafe<ThesisProgress[]>(`/analytics/thesis-progress${deptParam}`),
+        fetchSafe<CWADistribution[]>(`/analytics/cwa-distribution${deptParam}`),
+        fetchSafe<ProgramBreakdown[]>(`/analytics/program-breakdown${deptParam}`),
+        fetchSafe<EnrollmentTrend[]>(`/analytics/enrollment-trend${deptParam}`),
+        fetchSafe<{ departments: number; programs: number }>(`/analytics/counts${deptParam}`),
+        fetchSafe<Alert[]>(`/analytics/alerts${deptParam}`),
       ]);
 
       setOverview(overviewData);
-      setEnrollmentByDept(enrollmentData);
-      setFeesTrend(feesData);
-      setThesisProgress(thesisData);
-      setCwaDistribution(cwaData);
-      setProgramBreakdown(programData);
-      setEnrollmentTrend(trendData);
-      setAlerts(alertsData);
+      setEnrollmentByDept(enrollmentData || []);
+      setFeesTrend(feesData || []);
+      setThesisProgress(thesisData || []);
+      setCwaDistribution(cwaData || []);
+      setProgramBreakdown(programData || []);
+      setEnrollmentTrend(trendData || []);
+      setCounts(countsData || { departments: 0, programs: 0 });
+      setAlerts(alertsData || []);
     } catch (err) {
       console.error("Failed to load analytics:", err);
     } finally {
@@ -221,10 +232,10 @@ const Analytics = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">
-            {isSuperAdmin ? "School Analytics" : `${department} Analytics`}
+            {isSuperAdmin ? "School Analytics" : isDean ? "Analytics" : `${department} Analytics`}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {isSuperAdmin ? "Comprehensive overview — Real-time data" : `Department overview — Real-time data`}
+            {isSuperAdmin ? "Comprehensive overview — Real-time data" : isDean ? "School of Postgraduate Studies — Real-time data" : `Department overview — Real-time data`}
           </p>
         </div>
         <button 
@@ -269,8 +280,8 @@ const Analytics = () => {
         <StatCard
           icon={<BookOpen size={18} className="text-muted-foreground" />}
           label="Active Programs"
-          value={programBreakdown.length.toString()}
-          sub={`${enrollmentByDept.length} departments`}
+          value={counts.programs.toString()}
+          sub={`${counts.departments} department${counts.departments !== 1 ? "s" : ""}`}
         />
       </div>
 

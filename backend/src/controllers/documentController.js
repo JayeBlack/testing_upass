@@ -39,7 +39,7 @@ exports.create = async (req, res) => {
   try {
     const { student_id, doc_type, purpose } = req.body;
     const result = await db.query(
-      `INSERT INTO document_requests (student_id, doc_type, purpose) VALUES ($1, $2, $3) RETURNING *`,
+      `INSERT INTO document_requests (student_id, doc_type, purpose) VALUES ($1::integer, $2, $3) RETURNING *`,
       [student_id, doc_type, purpose]
     );
     res.status(201).json(result.rows[0]);
@@ -71,7 +71,7 @@ exports.uploadForStudents = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
-    const { title, student_ids } = req.body;
+    const { title, student_ids, request_id } = req.body;
     if (!title || !student_ids) {
       return res.status(400).json({ error: "Missing title or student_ids" });
     }
@@ -92,27 +92,52 @@ exports.uploadForStudents = async (req, res) => {
     );
     const uploadId = uploadResult.rows[0].id;
 
-    // Create document records for each student and send notifications
-    for (const studentId of studentIdArray) {
+    // If request_id is provided, update existing request instead of creating new one
+    if (request_id) {
       await client.query(
-        `INSERT INTO document_requests (student_id, doc_type, purpose, status, file_url, upload_id)
-         VALUES ($1, $2, $3, 'Ready', $4, $5)`,
-        [studentId, title, `Uploaded by ${req.user.name || 'Dean'}`, fileUrl, uploadId]
+        `UPDATE document_requests 
+         SET status = $1, file_url = $2, upload_id = $3, completed_at = NOW(), processed_by = $4 
+         WHERE id = $5`,
+        ['Ready', fileUrl, uploadId, req.user.id, request_id]
       );
-
+      
       // Get student's user_id for notification
-      const studentQuery = await client.query(
-        'SELECT user_id FROM students WHERE id = $1',
-        [studentId]
+      const requestInfo = await client.query(
+        'SELECT s.user_id, dr.doc_type FROM document_requests dr JOIN students s ON dr.student_id = s.id WHERE dr.id = $1',
+        [request_id]
       );
-      if (studentQuery.rows.length > 0) {
+      if (requestInfo.rows.length > 0) {
         await createNotification(
-          studentQuery.rows[0].user_id,
+          requestInfo.rows[0].user_id,
           'document',
-          'New Document Available',
-          `${title} has been uploaded for you. Check your documents page.`,
+          'Document Ready',
+          `Your ${requestInfo.rows[0].doc_type} request has been processed and is ready for download.`,
           'info'
         );
+      }
+    } else {
+      // Create new document records for each student (bulk upload scenario)
+      for (const studentId of studentIdArray) {
+        await client.query(
+          `INSERT INTO document_requests (student_id, doc_type, purpose, status, file_url, upload_id)
+           VALUES ($1::integer, $2, $3, $4, $5, $6)`,
+          [studentId, title, `Uploaded by ${req.user.first_name || req.user.name || 'Dean'}`, 'Ready', fileUrl, uploadId]
+        );
+
+        // Get student's user_id for notification
+        const studentQuery = await client.query(
+          'SELECT user_id FROM students WHERE id = $1',
+          [studentId]
+        );
+        if (studentQuery.rows.length > 0) {
+          await createNotification(
+            studentQuery.rows[0].user_id,
+            'document',
+            'New Document Available',
+            `${title} has been uploaded for you. Check your documents page.`,
+            'info'
+          );
+        }
       }
     }
 

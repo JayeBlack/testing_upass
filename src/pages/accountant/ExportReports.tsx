@@ -165,22 +165,6 @@ const ExportReports = () => {
         String(data.unpaid),
         ((data.cleared / data.total) * 100).toFixed(1),
       ]);
-    } else if (report === "defaulters") {
-      title = `Defaulters List${filterSuffix}`;
-      const defaulters = freshFiltered.filter((f) => !f.is_cleared);
-      headers = ["#", "Student Name", "Index Number", "Program", "Total Fee (GHS)", "Paid (GHS)", "Outstanding (GHS)", "Status", "Academic Year", "Semester"];
-      rows = defaulters.map((f, i) => [
-        String(i + 1),
-        `${f.first_name} ${f.last_name}`,
-        f.index_number,
-        f.program_name,
-        Number(f.total_amount).toFixed(2),
-        Number(f.amount_paid).toFixed(2),
-        Number(f.outstanding).toFixed(2),
-        f.status || "Unpaid",
-        f.academic_year,
-        f.semester,
-      ]);
     }
 
     try {
@@ -202,7 +186,6 @@ const ExportReports = () => {
     { id: "collection", name: "Fee Collection Summary", description: "Total fees collected by program, semester, and academic year" },
     { id: "outstanding", name: "Outstanding Balances Report", description: "Students with unpaid fees and amounts owed" },
     { id: "compliance", name: "Payment Compliance Report", description: "Compliance rates — cleared, partial, unpaid across all programs" },
-    { id: "defaulters", name: "Defaulters List", description: "Complete list of students with outstanding fees" },
   ];
 
   return (

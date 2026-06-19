@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Navigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ShieldCheck, UserPlus, X, Trash2, Search, Power, KeyRound, Loader2 } from "lucide-react";
+import { ShieldCheck, UserPlus, X, Trash2, Search, Power, KeyRound, Loader2, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +22,6 @@ interface SystemUser {
 }
 
 const ROLES: SystemRole[] = ["Supervisor", "Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "Accountant", "AccountingAssistant", "ExamsOfficer"];
-const DEPARTMENTS = ["Computer Science", "Mining Engineering", "Electrical Engineering", "Mechanical Engineering", "Geomatic Engineering", "Finance Office", "School of Postgraduate Studies"];
 
 const roleColor = (role: string) => {
   if (role === "Admin") return "bg-secondary/15 text-secondary-foreground";
@@ -34,9 +33,15 @@ const ManageUsers = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [users, setUsers] = useState<SystemUser[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<SystemUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [saving, setSaving] = useState(false);
@@ -48,8 +53,12 @@ const ManageUsers = () => {
   const load = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch<SystemUser[]>("/users");
-      setUsers(data || []);
+      const [usersData, deptsData] = await Promise.all([
+        apiFetch<SystemUser[]>("/users"),
+        apiFetch<{ id: number; name: string }[]>("/departments")
+      ]);
+      setUsers(usersData || []);
+      setDepartments(deptsData?.map(d => d.name) || []);
     } catch {
       // backend offline
     } finally {
@@ -70,27 +79,52 @@ const ManageUsers = () => {
       toast({ title: "Missing fields", description: "Name and email are required", variant: "destructive" });
       return;
     }
+    
+    // DEBUG: Log form state
+    console.log('=== FRONTEND CREATE USER DEBUG ===');
+    console.log('Form state:', form);
+    console.log('Department value:', form.department);
+    console.log('Department is empty?', form.department === "");
+    
     setSaving(true);
     try {
       const [first_name, ...rest] = form.name.trim().split(/\s+/);
       const last_name = rest.join(" ") || first_name;
+      
+      const payload: any = { 
+        email: form.email.trim().toLowerCase(), 
+        first_name, 
+        last_name, 
+        role: form.role, 
+        phone: form.phone || undefined, 
+        department: form.department && form.department.trim() !== "" ? form.department : undefined,
+        is_super_admin: form.role === "Admin" ? form.isSuperAdmin : false
+      };
+      
+      // Add supervisor-specific fields if creating a supervisor
+      if (form.role === "Supervisor") {
+        payload.title = form.title;
+        payload.staff_id = form.staffId || undefined;
+        payload.specialization = form.specialization || undefined;
+      }
+      
+      console.log('Sending payload:', JSON.stringify(payload, null, 2));
+      console.log('Department being sent:', payload.department);
+      
       const res = await apiFetch<{ user: any; default_password: string }>("/auth/admin/create-staff", {
         method: "POST",
-        body: JSON.stringify({ email: form.email.trim().toLowerCase(), first_name, last_name, role: form.role, phone: form.phone || undefined, is_super_admin: form.role === "Admin" ? form.isSuperAdmin : false }),
+        body: JSON.stringify(payload),
       });
 
-      if (form.role === "Supervisor") {
-        await apiFetch("/supervisors/register", {
-          method: "POST",
-          body: JSON.stringify({ user_id: res.user.id, staff_id: form.staffId || undefined, title: form.title, department: form.department, specialization: form.specialization || undefined }),
-        }).catch(() => {});
-      }
+      console.log('User created successfully:', res);
+      console.log('=== END FRONTEND DEBUG ===\n');
 
       toast({ title: "Staff account created", description: `Default password: ${res.default_password}` });
       setForm({ name: "", email: "", role: "Supervisor", department: "", phone: "", staffId: "", title: "Dr.", specialization: "", isSuperAdmin: false });
       setShowForm(false);
       load();
     } catch (err) {
+      console.error('Frontend error:', err);
       toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Could not create account", variant: "destructive" });
     } finally {
       setSaving(false);
@@ -106,11 +140,28 @@ const ManageUsers = () => {
     }
   };
 
-  const handleResetPassword = async (u: SystemUser) => {
-    if (!confirm(`Reset password for ${u.name}?`)) return;
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser) return;
+    if (!newPassword || newPassword.trim().length < 6) {
+      toast({ title: "Invalid password", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Passwords don't match", description: "Please ensure both passwords match", variant: "destructive" });
+      return;
+    }
     try {
-      const res = await apiFetch<{ default_password: string }>("/auth/admin/reset-password", { method: "POST", body: JSON.stringify({ user_id: Number(u.id) }) });
-      toast({ title: "Password reset", description: `New password: ${res.default_password}` });
+      await apiFetch("/auth/admin/set-password", { 
+        method: "POST", 
+        body: JSON.stringify({ 
+          user_id: Number(resetPasswordUser.id),
+          new_password: newPassword.trim()
+        }) 
+      });
+      toast({ title: "Password updated", description: `Password changed successfully for ${resetPasswordUser.name}` });
+      setResetPasswordUser(null);
+      setNewPassword("");
+      setConfirmPassword("");
     } catch (err) {
       toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
     }
@@ -183,7 +234,7 @@ const ManageUsers = () => {
                     <td className="px-6 py-4"><span className={`text-xs font-medium px-2.5 py-1 rounded-full ${u.is_active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{u.is_active ? "Active" : "Inactive"}</span></td>
                     <td className="px-6 py-4 text-right">
                       <div className="inline-flex items-center gap-1">
-                        <button onClick={() => handleResetPassword(u)} title="Reset password" className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><KeyRound size={15} /></button>
+                        <button onClick={() => { setResetPasswordUser(u); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }} title="Reset password" className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><KeyRound size={15} /></button>
                         <button onClick={() => handleToggle(u)} title={u.is_active ? "Deactivate" : "Reactivate"} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"><Power size={15} /></button>
                         <button onClick={() => setConfirmDelete(u.id)} title="Delete" className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={15} /></button>
                       </div>
@@ -228,7 +279,7 @@ const ManageUsers = () => {
                   <label className="text-xs font-medium text-muted-foreground">Department</label>
                   <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none">
                     <option value="">— Select —</option>
-                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    {departments.map((d) => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               </div>
@@ -284,6 +335,69 @@ const ManageUsers = () => {
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => setConfirmDelete(null)}>Cancel</Button>
               <Button variant="destructive" className="flex-1" onClick={() => handleDelete(confirmDelete)}>Delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetPasswordUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => { setResetPasswordUser(null); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }}>
+          <div className="bg-card rounded-2xl border border-border p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center"><KeyRound size={18} className="text-secondary" /></div>
+                <div>
+                  <h3 className="font-display text-lg font-bold text-foreground">Reset Password</h3>
+                  <p className="text-xs text-muted-foreground">{resetPasswordUser.name}</p>
+                </div>
+              </div>
+              <button onClick={() => { setResetPasswordUser(null); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }} className="p-1 rounded hover:bg-muted transition-colors"><X size={18} className="text-muted-foreground" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">New Password *</label>
+                <div className="relative">
+                  <input 
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword} 
+                    onChange={(e) => setNewPassword(e.target.value)} 
+                    className="w-full mt-1 px-4 pr-11 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" 
+                    placeholder="Enter new password (min. 6 characters)"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Confirm Password *</label>
+                <div className="relative">
+                  <input 
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword} 
+                    onChange={(e) => setConfirmPassword(e.target.value)} 
+                    className="w-full mt-1 px-4 pr-11 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" 
+                    placeholder="Re-enter password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">User will be required to change this password on next login</p>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => { setResetPasswordUser(null); setNewPassword(""); setConfirmPassword(""); setShowNewPassword(false); setShowConfirmPassword(false); }}>Cancel</Button>
+                <Button className="flex-1 gradient-gold text-secondary-foreground" onClick={handleResetPassword}>Set Password</Button>
+              </div>
             </div>
           </div>
         </div>
