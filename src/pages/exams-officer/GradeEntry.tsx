@@ -1,11 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-<<<<<<< HEAD
-import { Upload, Plus, Trash2, CheckCircle, AlertTriangle, FileText, Loader2 } from "lucide-react";
-=======
 import { Upload, Plus, Trash2, CheckCircle, AlertTriangle, FileText, Loader } from "lucide-react";
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
 import { readSheetFile, SHEET_ACCEPT } from "@/lib/sheet-import";
 import { apiFetch } from "@/lib/api";
 
@@ -64,12 +60,8 @@ const GradeEntry = () => {
   const [rows, setRows] = useState<GradeRow[]>([]);
   const [cwaResults, setCwaResults] = useState<CWAResult[]>([]);
   const [status, setStatus] = useState<BatchStatus>("Draft");
-<<<<<<< HEAD
-  const [publishing, setPublishing] = useState(false);
-=======
   const [isPublishing, setIsPublishing] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
   const [semester, setSemester] = useState("Semester 1");
   const [academicYear, setAcademicYear] = useState(academicYearOptions[1]);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -146,32 +138,6 @@ const GradeEntry = () => {
       return;
     }
 
-<<<<<<< HEAD
-    setPublishing(true);
-    try {
-      const grades = rows.filter((r) => r.valid).map((r) => ({
-        student_index: r.indexNumber,
-        student_name: r.studentName,
-        course_name: r.courseName,
-        grade: marksToGrade(Number(r.marks)),
-        marks: Number(r.marks),
-        credits: Number(r.credits),
-      }));
-      const res = await apiFetch<{ message: string; errors?: string[] }>("/results/grades/by-index", {
-        method: "POST",
-        body: JSON.stringify({ grades, semester, academic_year: academicYear }),
-      });
-      if (res.errors?.length) {
-        toast({ title: `Published with ${res.errors.length} error(s)`, description: res.errors.slice(0, 3).join(", "), variant: "destructive" });
-      } else {
-        toast({ title: "Results published", description: `${res.message} — visible to students` });
-      }
-      setStatus("Published");
-    } catch (err: any) {
-      toast({ title: "Publish failed", description: err.message, variant: "destructive" });
-    } finally {
-      setPublishing(false);
-=======
     setIsPublishing(true);
     try {
       const grades = cwaResults.flatMap((student) =>
@@ -221,7 +187,6 @@ const GradeEntry = () => {
       toast({ title: "Results deleted", description: "Published results have been removed" });
     } catch (err) {
       toast({ title: "Delete failed", description: (err as Error).message, variant: "destructive" });
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
     }
   };
 
@@ -338,19 +303,6 @@ const GradeEntry = () => {
           <button onClick={calculateCWA} disabled={!allValid} className="px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
             Calculate CWA
           </button>
-<<<<<<< HEAD
-          <button
-            onClick={publishResults}
-            disabled={!allValid || cwaResults.length === 0 || status === "Published" || publishing}
-            className="px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {publishing && <Loader2 size={14} className="animate-spin" />}
-            {status === "Published" ? "Published" : "Publish Results"}
-          </button>
-          <button onClick={clearAll} className="px-5 py-2.5 rounded-lg border border-destructive/30 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors">
-            {status === "Published" ? "Clear & Start New" : "Clear Draft"}
-          </button>
-=======
           <button onClick={publishResults} disabled={!allValid || cwaResults.length === 0 || status === "Published" || isPublishing} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50">
             {isPublishing ? <Loader size={14} className="animate-spin" /> : null}
             {status === "Published" ? "Published" : "Publish Results"}
@@ -360,7 +312,6 @@ const GradeEntry = () => {
               {status === "Published" ? "Delete Published Results" : "Clear Draft"}
             </button>
           )}
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
         </div>
       )}
 

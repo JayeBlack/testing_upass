@@ -1,39 +1,18 @@
 import DashboardLayout from "@/components/DashboardLayout";
-<<<<<<< HEAD
-import { BarChart3, TrendingUp, TrendingDown, Minus, FileText, Loader2 } from "lucide-react";
-=======
 import { BarChart3, TrendingUp, TrendingDown, Minus, FileText, Loader } from "lucide-react";
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 
-<<<<<<< HEAD
-interface GradeRecord {
-  id: string;
-  course_id: string;
-=======
 interface GradeData {
   id: string;
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
   code: string;
   course_name: string;
   credits: number;
   grade: string;
   marks: number;
-<<<<<<< HEAD
-  semester: string;
-  academic_year: string;
-}
-
-interface SemesterGroup {
-  label: string;
-  short: string;
-  semester: string;
-  academic_year: string;
-=======
   semester: number;
   academic_year: string;
 }
@@ -41,7 +20,6 @@ interface SemesterGroup {
 interface SemesterResult {
   label: string;
   short: string;
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
   courses: { code: string; name: string; credits: number; grade: string; marks: number }[];
   cwa: number;
 }
@@ -56,59 +34,6 @@ const calcCwa = (courses: { marks: number; credits: number }[]) => {
 const Results = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-<<<<<<< HEAD
-  const [grades, setGrades] = useState<GradeRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      try {
-        // fetch the student record to get student.id (different from user.id)
-        const students = await apiFetch<any[]>("/students");
-        const me = students.find((s: any) => String(s.user_id) === String(user.id));
-        if (!me) { setLoading(false); return; }
-        const data = await apiFetch<GradeRecord[]>(`/results/student/${me.id}`);
-        setGrades(data || []);
-      } catch {
-        // backend offline or no results yet
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [user?.id]);
-
-  // Group grades by semester + academic_year
-  const semesterMap = new Map<string, SemesterGroup>();
-  grades.forEach((g) => {
-    const key = `${g.academic_year}__${g.semester}`;
-    if (!semesterMap.has(key)) {
-      semesterMap.set(key, {
-        label: `${g.semester}, ${g.academic_year}`,
-        short: `${g.semester.replace("Semester ", "S")} ${g.academic_year.slice(-4)}`,
-        semester: g.semester,
-        academic_year: g.academic_year,
-        courses: [],
-        cwa: 0,
-      });
-    }
-    semesterMap.get(key)!.courses.push({
-      code: g.code || "—",
-      name: g.course_name,
-      credits: g.credits,
-      grade: g.grade,
-      marks: g.marks,
-    });
-  });
-
-  const semesterData: SemesterGroup[] = Array.from(semesterMap.values()).map((s) => ({
-    ...s,
-    cwa: calcCwa(s.courses),
-  }));
-
-  const allCourses = grades.map((g) => ({ marks: g.marks, credits: g.credits }));
-  const overallCwa = calcCwa(allCourses);
-=======
   const [semesterData, setSemesterData] = useState<SemesterResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +141,6 @@ const Results = () => {
       </DashboardLayout>
     );
   }
->>>>>>> d169077ec8d0bac1082407d22f518c6e5eeb7052
 
   return (
     <DashboardLayout>
