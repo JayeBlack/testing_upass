@@ -443,19 +443,3 @@ const FeeAnalytics = () => {
                       <Tooltip content={<CustomTooltip />} />
                       <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                       <Bar dataKey="total" name="Total Billed" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="collected" name="Collected" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="outstanding" name="Outstanding" fill="#f43f5e" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-            </div>
-          )}
-        </>
-      )}
-    </DashboardLayout>
-  );
-};
-
-export default FeeAnalytics;
