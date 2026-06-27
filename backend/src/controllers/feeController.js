@@ -341,6 +341,96 @@ exports.getCharts = async (req, res) => {
   }
 };
 
+// POST /api/fees/save-schedule
+// Saves the original Excel file directly without modification
+exports.saveSchedule = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const fs = require("fs");
+    const path = require("path");
+    // Use process.cwd() which is the backend/ directory when running
+    const uploadDir = path.join(process.cwd(), "uploads", "fee-schedules");
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    const originalName = req.file.originalname || "fee-schedule";
+    const ext = path.extname(originalName) || ".xlsx";
+    const uniqueName = `fee-schedule-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const destPath = path.join(uploadDir, uniqueName);
+    
+    // Save the original file buffer directly - no parsing or regeneration
+    const buffer = Buffer.from(req.file.buffer);
+    fs.writeFileSync(destPath, buffer);
+
+    const downloadUrl = `/uploads/fee-schedules/${uniqueName}`;
+    res.status(201).json({ downloadUrl, fileName: uniqueName });
+  } catch (err) {
+    console.error(`[Fee Save Schedule] Error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/fees/parse-fee-schedule
+// Accepts multipart file (XLSX) — fee schedule with Programme, Level, Amount columns
+exports.parseFeeSchedule = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const isExcel = /\.(xlsx?|xls)$/i.test(req.file.originalname || req.file.mimetype);
+    let rows = [];
+
+    if (isExcel) {
+      const XLSX = require("xlsx");
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      if (data.length < 2) return res.status(400).json({ error: "File must contain header and at least one row" });
+
+      const headers = data[0].map((h) => String(h).toLowerCase().replace(/[^a-z]/g, ""));
+      const progIdx = headers.findIndex((h) => h.includes("programme") || h.includes("program"));
+      const levelIdx = headers.findIndex((h) => h.includes("level") || h.includes("year"));
+      const amountIdx = headers.findIndex((h) => h.includes("amount") || h.includes("fee") || h.includes("total"));
+
+      rows = data.slice(1)
+        .filter((row) => row.some((c) => String(c).trim()))
+        .map((row) => ({
+          programme: String(row[progIdx >= 0 ? progIdx : 0] || "").trim(),
+          level: String(row[levelIdx >= 0 ? levelIdx : 1] || "").trim(),
+          amount: String(row[amountIdx >= 0 ? amountIdx : 2] || "").trim(),
+        }))
+        .filter((r) => r.programme && r.amount);
+    } else {
+      // CSV — parse from buffer text
+      const text = req.file.buffer.toString("utf-8");
+      const lines = text.trim().split("\n");
+      if (lines.length < 2) return res.status(400).json({ error: "File must contain header and at least one row" });
+
+      const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/"/g, ""));
+      const progIdx = headers.findIndex((h) => h.includes("programme") || h.includes("program"));
+      const levelIdx = headers.findIndex((h) => h.includes("level") || h.includes("year"));
+      const amountIdx = headers.findIndex((h) => h.includes("amount") || h.includes("fee") || h.includes("total"));
+
+      rows = lines.slice(1).filter((l) => l.trim()).map((line) => {
+        const cols = line.split(",").map((c) => c.trim().replace(/"/g, ""));
+        return {
+          programme: cols[progIdx >= 0 ? progIdx : 0] || "",
+          level: cols[levelIdx >= 0 ? levelIdx : 1] || "",
+          amount: cols[amountIdx >= 0 ? amountIdx : 2] || "",
+        };
+      }).filter((r) => r.programme && r.amount);
+    }
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "No valid fee schedule records found. Ensure columns include Programme, Level, and Amount." });
+    }
+
+    res.json({ rows });
+  } catch (err) {
+    console.error(`[Fee Parse Schedule] Error:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // POST /api/fees/parse-bulk
 // Accepts multipart file (CSV or XLSX)
 // Returns parsed rows: { rows: [{ index_number, total_amount, amount_paid, academic_year, semester }, ...] }

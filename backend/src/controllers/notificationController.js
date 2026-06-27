@@ -295,5 +295,34 @@ exports.create = async (req, res) => {
   }
 };
 
+// POST /api/notifications/broadcast — send to all students
+exports.broadcast = async (req, res) => {
+  try {
+    const { title, message, type = "general", severity = "info" } = req.body;
+    if (!title || !message) return res.status(400).json({ error: "Title and message are required" });
+
+    const students = await db.query("SELECT user_id FROM students WHERE user_id IS NOT NULL");
+    const userIds = students.rows.map((r) => r.user_id);
+    if (userIds.length === 0) return res.status(400).json({ error: "No students found" });
+
+    const values = [];
+    const params = [];
+    let idx = 1;
+    userIds.forEach((uid) => {
+      values.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+      params.push(uid, title, message, type, severity);
+    });
+
+    await db.query(
+      `INSERT INTO notifications (user_id, title, message, type, severity) VALUES ${values.join(", ")}`,
+      params
+    );
+
+    res.status(201).json({ sent: userIds.length, message: `Notification sent to ${userIds.length} students` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // Export helper for use in other controllers
 exports.createNotification = createNotification;

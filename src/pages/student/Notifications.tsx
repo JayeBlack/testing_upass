@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Bell, Banknote, FileText, Calendar, CheckCircle, Trash2, Loader2 } from "lucide-react";
+import { Bell, Banknote, FileText, Calendar, CheckCircle, Trash2, Loader2, Download } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
@@ -147,7 +147,26 @@ const Notifications = () => {
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.message}</p>
+                  <div className="mt-2">
+                    {n.type === "fee" ? (
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={(() => {
+                            const urlMatch = n.message.match(/(https?:\/\/[^\s]+\.(xlsx|xls|csv))/);
+                            return urlMatch ? urlMatch[1] : "#";
+                          })()}
+                          download
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Download size={14} />
+                          Download Fee Schedule
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground whitespace-pre-line">{n.message}</p>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground/60 mt-2">{formatDate(n.created_at)}</p>
                 </div>
               </div>
