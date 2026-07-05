@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Users, BookOpen, Banknote, GraduationCap, TrendingUp, TrendingDown, CheckCircle, Clock, BarChart3, AlertTriangle, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { Users, BookOpen, Banknote, GraduationCap, TrendingUp, TrendingDown, CheckCircle, Clock, BarChart3, AlertTriangle, ChevronRight, Loader2, Eye } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
@@ -139,7 +139,9 @@ const Analytics = () => {
 
   const isSuperAdmin = user?.isSuperAdmin || user?.role === "Admin" || user?.role === "Dean" || user?.role === "ViceDean";
   const isDean = user?.role === "Dean" || user?.role === "ViceDean";
-  const department = isSuperAdmin ? "all" : user?.department;
+  const isExamsOfficer = user?.role === "ExamsOfficer";
+  // ExamsOfficer sees all data regardless of department
+  const department = isSuperAdmin || isExamsOfficer ? "all" : user?.department;
 
   const loadAllData = async () => {
     setLoading(true);
@@ -213,12 +215,14 @@ const Analytics = () => {
   const eligiblePct = totalGraduands > 0 ? (((overview?.graduands_eligible || 0) / totalGraduands) * 100).toFixed(1) : "0";
 
   const thesisColors: Record<string, string> = {
-    "Proposal": "hsl(199 89% 48%)",
-    "Chapter 1-2": "hsl(48 95% 50%)",
-    "Chapter 3-4": "hsl(145 60% 22%)",
-    "Submitted": "hsl(38 92% 50%)",
-    "Defended": "hsl(142 71% 45%)",
     "Not Started": "hsl(120 8% 45%)",
+    "Proposal":    "hsl(199 89% 48%)",
+    "Chapter 1":   "hsl(48 95% 50%)",
+    "Chapter 2":   "hsl(38 92% 50%)",
+    "Chapter 3":   "hsl(145 60% 22%)",
+    "Chapter 4":   "hsl(142 71% 45%)",
+    "Chapter 5":   "hsl(271 81% 56%)",
+    "Defense":     "hsl(0 72% 51%)",
   };
 
   const thesisWithColors = thesisProgress.map(t => ({
@@ -228,22 +232,21 @@ const Analytics = () => {
 
   return (
     <DashboardLayout>
-      {/* Header with Refresh */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold font-display text-foreground">
-            {isSuperAdmin ? "School Analytics" : isDean ? "Analytics" : `${department} Analytics`}
+            {isSuperAdmin ? "School Analytics" : isExamsOfficer ? "Exams Office Analytics" : isDean ? "Analytics" : `${department} Analytics`}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {isSuperAdmin ? "Comprehensive overview — Real-time data" : isDean ? "School of Postgraduate Studies — Real-time data" : `Department overview — Real-time data`}
+            {isSuperAdmin ? "Comprehensive overview — Real-time data" : isExamsOfficer ? "Academic performance & enrollment tracking — Real-time data" : isDean ? "School of Postgraduate Studies — Real-time data" : `Department overview — Real-time data`}
           </p>
+          {isExamsOfficer && (
+            <p className="text-xs text-info mt-1 flex items-center gap-1">
+              <Eye size={12} /> Read-only access
+            </p>
+          )}
         </div>
-        <button 
-          onClick={loadAllData}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
-        >
-          <RefreshCw size={14} /> Refresh Data
-        </button>
       </div>
 
       {/* Key Metrics */}

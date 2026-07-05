@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { BookOpen, CheckCircle, Lock, Building2, CalendarDays, GraduationCap, Save, Loader2 } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
-import { PROGRAMME_COURSE_CATALOGS, type ProgrammeCourse } from "@/data/programmeCourses";
+import { PROGRAMME_COURSE_CATALOGS, type ProgrammeCourse, getCanonicalDepartment } from "@/data/programmeCourses";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -74,51 +74,90 @@ const CourseRegistration = () => {
     // Exact match
     if (normalizedCatalog === normalizedStudent) return true;
     
-    // Check if catalog contains student program (e.g., "Mining Engineering (MSc / MPhil) — July" contains "MSc. Mining Engineering")
+    // Check if catalog contains student program
     if (normalizedCatalog.includes(normalizedStudent)) return true;
     
-    // Check if student program contains catalog (e.g., "MSc. Mining Engineering" contains "Mining Engineering")
+    // Check if student program contains catalog
     if (normalizedStudent.includes(normalizedCatalog)) return true;
     
     // Extract key words and check overlap
-    const catalogWords = catalogLabel.toLowerCase().split(/[\s/()—.]+/).filter(w => w.length > 2 && !['msc', 'mphil', 'phd', 'july', 'january', 'and', 'the'].includes(w));
-    const studentWords = studentProg.toLowerCase().split(/[\s/()—.]+/).filter(w => w.length > 2 && !['msc', 'mphil', 'phd', 'july', 'january', 'and', 'the'].includes(w));
+    const catalogWords = catalogLabel.toLowerCase().split(/[\s/()—.]+/).filter(w => w.length > 2 && !['msc', 'mphil', 'phd', 'mba', 'pgd', 'july', 'january', 'and', 'the', 'of'].includes(w));
+    const studentWords = studentProg.toLowerCase().split(/[\s/()—.]+/).filter(w => w.length > 2 && !['msc', 'mphil', 'phd', 'mba', 'pgd', 'july', 'january', 'and', 'the', 'of'].includes(w));
     
-    // If at least 70% of student words appear in catalog words, it's a match
+    // If at least 50% of student words appear in catalog words (lowered threshold)
     const matchingWords = studentWords.filter(sw => catalogWords.some(cw => cw.includes(sw) || sw.includes(cw)));
-    return matchingWords.length >= Math.ceil(studentWords.length * 0.7);
+    return matchingWords.length >= Math.ceil(studentWords.length * 0.5);
   };
 
   // Find the catalog entry that matches the student's enrollment
   const catalog = useMemo(() => {
+    console.log('🔍 Searching for catalog...');
+    console.log('Student Department:', studentDepartment);
+    console.log('Student Program:', studentProgram);
+    console.log('Student Cohort:', studentCohort);
+
+    // Get canonical department name to handle variations
+    const canonicalDept = getCanonicalDepartment(studentDepartment || '');
+    console.log('Canonical Department:', canonicalDept || 'None found');
+
     // Try exact match first (department + program + cohort)
     let match = PROGRAMME_COURSE_CATALOGS.find(
       (c) => 
-        c.department === studentDepartment && 
+        (c.department === studentDepartment || 
+         (canonicalDept && (c.department === canonicalDept || getCanonicalDepartment(c.department) === canonicalDept))) && 
         c.label === studentProgram &&
         (c.admissionCycle ?? "January") === studentCohort
     );
-    if (match) return match;
+    if (match) {
+      console.log('✅ Found exact match:', match.label);
+      return match;
+    }
 
-    // Try fuzzy match with department + cohort
+    // Try fuzzy match with department (canonical or exact) + cohort
     match = PROGRAMME_COURSE_CATALOGS.find(
       (c) => 
-        c.department === studentDepartment && 
+        (c.department === studentDepartment || 
+         (canonicalDept && (c.department === canonicalDept || getCanonicalDepartment(c.department) === canonicalDept))) && 
         matchesProgramme(c.label, studentProgram) &&
         (c.admissionCycle ?? "January") === studentCohort
     );
-    if (match) return match;
+    if (match) {
+      console.log('✅ Found fuzzy match with cohort:', match.label);
+      return match;
+    }
 
     // Try fuzzy match without cohort (for programs without cohort-specific catalogs)
     match = PROGRAMME_COURSE_CATALOGS.find(
       (c) => 
-        c.department === studentDepartment && 
+        (c.department === studentDepartment || 
+         (canonicalDept && (c.department === canonicalDept || getCanonicalDepartment(c.department) === canonicalDept))) && 
         matchesProgramme(c.label, studentProgram)
     );
-    if (match) return match;
+    if (match) {
+      console.log('✅ Found fuzzy match without cohort:', match.label);
+      return match;
+    }
 
-    // Last resort: match by department only (show first catalog for that department)
-    return PROGRAMME_COURSE_CATALOGS.find(c => c.department === studentDepartment);
+    // Last resort: match by canonical department only
+    if (canonicalDept) {
+      const deptMatch = PROGRAMME_COURSE_CATALOGS.find(c => 
+        c.department === canonicalDept || getCanonicalDepartment(c.department) === canonicalDept
+      );
+      if (deptMatch) {
+        console.log('⚠️ Using canonical department fallback:', deptMatch.label);
+        return deptMatch;
+      }
+    }
+    
+    // Final fallback: exact department match
+    const deptMatch = PROGRAMME_COURSE_CATALOGS.find(c => c.department === studentDepartment);
+    if (deptMatch) {
+      console.log('⚠️ Using department fallback:', deptMatch.label);
+    } else {
+      console.log('❌ No catalog found');
+      console.log('Available departments:', [...new Set(PROGRAMME_COURSE_CATALOGS.map(c => c.department))]);
+    }
+    return deptMatch;
   }, [studentDepartment, studentProgram, studentCohort]);
 
   // If no catalog found, show error message
@@ -129,14 +168,21 @@ const CourseRegistration = () => {
           <h1 className="text-3xl font-bold font-display text-foreground">Course Registration</h1>
           <p className="text-muted-foreground mt-1">Semester 1, 2025/2026 Academic Year</p>
         </div>
-        <div className="bg-card rounded-xl border border-destructive p-8 text-center">
-          <p className="text-destructive font-medium mb-2">Course catalog not found</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Your programme: <strong>{studentProgram}</strong><br />
-            Department: <strong>{studentDepartment}</strong><br />
-            Cohort: <strong>{studentCohort}</strong>
-          </p>
-          <p className="text-xs text-muted-foreground">Please contact your department administrator to set up the course catalog for your programme.</p>
+        <div className="bg-card rounded-xl border border-destructive p-8">
+          <p className="text-destructive font-medium mb-2 text-center">Course catalog not found</p>
+          <div className="text-left bg-muted p-4 rounded-lg mb-4">
+            <p className="text-sm font-semibold mb-2">Your Programme Information:</p>
+            <p className="text-sm mb-1">Programme: <strong>{studentProgram}</strong></p>
+            <p className="text-sm mb-1">Department: <strong>{studentDepartment}</strong></p>
+            <p className="text-sm mb-3">Cohort: <strong>{studentCohort || "January"}</strong></p>
+            <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">Available Departments:</p>
+            <ul className="text-xs text-muted-foreground list-disc list-inside mt-1">
+              {[...new Set(PROGRAMME_COURSE_CATALOGS.map(c => c.department))].sort().map(dept => (
+                <li key={dept}>{dept}</li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">Please contact your department administrator to set up the course catalog for your programme, or verify your department/programme information is correct.</p>
         </div>
       </DashboardLayout>
     );
@@ -355,34 +401,36 @@ const CourseRegistration = () => {
           
           <div className="bg-muted/30 rounded-lg p-3">
             <label className="text-xs text-muted-foreground mb-1 block">Admission Cohort</label>
-            <p className="text-sm font-medium text-foreground">{studentCohort === "January" ? "January - June" : "July - December"}</p>
+            <p className="text-sm font-medium text-foreground">{studentCohort || "January"}</p>
           </div>
         </div>
 
         {/* Programme details */}
-        <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary">
-              <Building2 size={11} /> {catalog.department}
-            </span>
-            {catalog.admissionCycle && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold gradient-gold text-secondary-foreground">
-                <CalendarDays size={11} /> {catalog.admissionCycle} intake
+        {catalog && (
+          <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-primary/10 text-primary">
+                <Building2 size={11} /> {catalog.department}
               </span>
+              {catalog.admissionCycle && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold gradient-gold text-secondary-foreground">
+                  <CalendarDays size={11} /> {catalog.admissionCycle} intake
+                </span>
+              )}
+              {catalog.levels?.map((lvl) => (
+                <span key={lvl} className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border border-border text-muted-foreground">
+                  {lvl}
+                </span>
+              ))}
+            </div>
+            <p className="text-sm font-semibold text-foreground">{catalog.label}</p>
+            {catalog.notes && catalog.notes.length > 0 && (
+              <ul className="mt-2 text-xs text-muted-foreground list-disc list-inside space-y-1">
+                {catalog.notes.map((n, i) => <li key={i}>{n}</li>)}
+              </ul>
             )}
-            {catalog.levels?.map((lvl) => (
-              <span key={lvl} className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium border border-border text-muted-foreground">
-                {lvl}
-              </span>
-            ))}
           </div>
-          <p className="text-sm font-semibold text-foreground">{catalog.label}</p>
-          {catalog.notes && catalog.notes.length > 0 && (
-            <ul className="mt-2 text-xs text-muted-foreground list-disc list-inside space-y-1">
-              {catalog.notes.map((n, i) => <li key={i}>{n}</li>)}
-            </ul>
-          )}
-        </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-6">

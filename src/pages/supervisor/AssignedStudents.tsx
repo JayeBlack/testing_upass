@@ -1,9 +1,8 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Users, FileText, Clock, Loader2, RefreshCw } from "lucide-react";
+import { Users, FileText, Clock, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 
 interface Student {
   id: number;
@@ -26,25 +25,18 @@ const AssignedStudents = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const studentsRef = useRef<Student[]>([]);
   const studentIdsRef = useRef<number[]>([]);
 
   const fetchSubmissions = useCallback(async () => {
     const ids = studentIdsRef.current;
     if (ids.length === 0) { setSubmissions([]); return; }
-    
-    setRefreshing(true);
     try {
       const allSubs = await apiFetch<any[]>("/thesis/pending");
       const filtered = allSubs.filter((s: any) => ids.includes(s.student_id));
       setSubmissions(filtered);
-      setLastUpdate(new Date());
     } catch {
       setSubmissions([]);
-    } finally {
-      setRefreshing(false);
     }
   }, []);
 
@@ -79,19 +71,6 @@ const AssignedStudents = () => {
   const pendingCount = submissions.filter((s) => s.status === "Pending").length;
   const awaitingApproval = submissions.filter((s) => s.status === "Reviewed" || s.status === "Awaiting Approval").length;
 
-  const handleManualRefresh = () => {
-    fetchSubmissions();
-  };
-
-  const formatLastUpdate = () => {
-    if (!lastUpdate) return "";
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - lastUpdate.getTime()) / 1000);
-    if (diff < 10) return "Just now";
-    if (diff < 60) return `${diff}s ago`;
-    return lastUpdate.toLocaleTimeString();
-  };
-
   const latestStage = useCallback((studentId: number) => {
     const studentSubs = submissions.filter((s) => s.student_id === studentId);
     
@@ -111,33 +90,10 @@ const AssignedStudents = () => {
   return (
     <DashboardLayout>
       <div className="mb-8">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
           <div>
             <h1 className="text-3xl font-bold font-display text-foreground">Assigned Students</h1>
-            <p className="text-muted-foreground mt-1">
-              Students under your supervision
-              {lastUpdate && (
-                <span className="ml-2 text-xs">• Updated {formatLastUpdate()}</span>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {refreshing && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
-                <Loader2 size={12} className="animate-spin" />
-                Refreshing...
-              </div>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              className="gap-2"
-            >
-              <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-              Refresh
-            </Button>
+            <p className="text-muted-foreground mt-1">Students under your supervision</p>
           </div>
         </div>
       </div>

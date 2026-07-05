@@ -1,11 +1,13 @@
 const db = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const path = require("path");
 
 // POST /api/auth/register
 exports.register = async (req, res) => {
   try {
-    const { email, password, first_name, last_name, role, phone, department_id, is_super_admin, must_change_password } = req.body;
+    const { email, password, first_name, last_name, role, phone, department_id, is_super_admin } = req.body;
     if (!email || !password || !first_name || !last_name || !role) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -15,14 +17,13 @@ exports.register = async (req, res) => {
       return res.status(409).json({ error: "Email already registered" });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
+    const password_hash = await bcrypt.hash(password, 10);
 
     const result = await db.query(
       `INSERT INTO users (email, password_hash, role, first_name, last_name, phone, department_id, is_super_admin, must_change_password, last_password_change)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, FALSE), COALESCE($9, TRUE), NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, FALSE), TRUE, NOW())
        RETURNING id, email, role, first_name, last_name, phone, avatar_url, department_id, is_super_admin, must_change_password, created_at`,
-      [email, password_hash, role, first_name, last_name, phone, department_id || null, is_super_admin, must_change_password]
+      [email, password_hash, role, first_name, last_name, phone, department_id || null, is_super_admin]
     );
 
     const user = result.rows[0];
@@ -213,6 +214,30 @@ exports.me = async (req, res) => {
   }
 };
 
+// POST /api/auth/upload-avatar  (authenticated)
+exports.uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    // Fetch old avatar before updating
+    const old = await db.query("SELECT avatar_url FROM users WHERE id = $1", [req.user.id]);
+    const oldUrl = old.rows[0]?.avatar_url;
+
+    const avatarUrl = `/uploads/general/${req.file.filename}`;
+    await db.query("UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2", [avatarUrl, req.user.id]);
+
+    // Delete old file if it was in uploads/general
+    if (oldUrl && oldUrl.startsWith("/uploads/general/")) {
+      const oldPath = path.join(__dirname, "../../..", oldUrl);
+      fs.unlink(oldPath, () => {});
+    }
+
+    res.json({ avatar_url: avatarUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // POST /api/auth/change-password  (authenticated)
 exports.changePassword = async (req, res) => {
   try {
@@ -226,8 +251,7 @@ exports.changePassword = async (req, res) => {
       const ok = await bcrypt.compare(old_password, r.rows[0].password_hash);
       if (!ok) return res.status(401).json({ error: "Current password is incorrect" });
     }
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(new_password, salt);
+    const hash = await bcrypt.hash(new_password, 10);
     await db.query(
       "UPDATE users SET password_hash = $1, must_change_password = FALSE, last_password_change = NOW(), updated_at = NOW() WHERE id = $2",
       [hash, req.user.id]
@@ -279,8 +303,7 @@ exports.adminResetPassword = async (req, res) => {
       console.log('Staff password (email prefix):', defaultPwd);
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(defaultPwd, salt);
+    const hash = await bcrypt.hash(defaultPwd, 10);
     
     console.log('Updating password for user_id:', user_id);
     await db.query(
@@ -320,8 +343,7 @@ exports.adminSetPassword = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(new_password, salt);
+    const hash = await bcrypt.hash(new_password, 10);
     
     await db.query(
       "UPDATE users SET password_hash = $1, must_change_password = TRUE, updated_at = NOW() WHERE id = $2",
@@ -379,8 +401,7 @@ exports.adminCreateStaff = async (req, res) => {
     }
 
     const defaultPwd = email.split("@")[0];
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(defaultPwd, salt);
+    const hash = await bcrypt.hash(defaultPwd, 10);
 
     console.log('Inserting user with department_id:', department_id);
     const result = await db.query(

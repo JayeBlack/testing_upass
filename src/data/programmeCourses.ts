@@ -1020,8 +1020,125 @@ export const PROGRAMME_COURSE_CATALOGS: ProgrammeCourseCatalog[] = [
   PGD_MINING_JULY,
 ];
 
+// Helper function to normalize department names for matching
+const normalizeDepartmentName = (name: string): string => {
+  return name.toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .replace(/and/g, '')
+    .replace(/dept/g, '')
+    .replace(/department/g, '')
+    .trim();
+};
+
+// Department aliases mapping - maps variations to canonical names
+const DEPARTMENT_ALIASES: Record<string, string[]> = {
+  "Computer Science and Engineering": [
+    "Computer Science",
+    "Computer Science and Engineering",
+    "CSE",
+    "CS",
+    "Computer Sci",
+    "Comp Science",
+  ],
+  "Electrical and Electronic Engineering": [
+    "Electrical and Electronic Engineering",
+    "Electrical Engineering",
+    "Electronic Engineering",
+    "EEE",
+    "Electrical",
+    "Electronics",
+  ],
+  "Mathematics": [
+    "Mathematics",
+    "Mathematical Sciences",
+    "Maths",
+    "Math",
+  ],
+  "Geomatic Engineering": [
+    "Geomatic Engineering",
+    "Geomatics",
+    "Geomatic",
+  ],
+  "Mechanical Engineering": [
+    "Mechanical Engineering",
+    "Mechanical",
+    "Mech Engineering",
+  ],
+  "Mining Engineering": [
+    "Mining Engineering",
+    "Mining",
+    "Mine Engineering",
+  ],
+  "Geological Engineering": [
+    "Geological Engineering",
+    "Geology",
+    "Geological",
+    "Geol Engineering",
+  ],
+  "Minerals Engineering": [
+    "Minerals Engineering",
+    "Mineral Engineering",
+    "Minerals",
+  ],
+  "Petroleum Engineering": [
+    "Petroleum Engineering",
+    "Petroleum",
+    "Pet Engineering",
+  ],
+  "Petroleum Refining and Petrochemical Engineering": [
+    "Petroleum Refining and Petrochemical Engineering",
+    "Petroleum Refining",
+    "Petrochemical Engineering",
+    "Refining",
+  ],
+  "Management Studies": [
+    "Management Studies",
+    "Management",
+    "Business Management",
+    "Mgt Studies",
+  ],
+  "Environmental and Safety Engineering": [
+    "Environmental and Safety Engineering",
+    "Environmental Engineering",
+    "Safety Engineering",
+    "Environmental",
+    "Safety",
+  ],
+};
+
+// Find canonical department name from any variation
+const getCanonicalDepartment = (department: string): string | null => {
+  const normalized = normalizeDepartmentName(department);
+  
+  for (const [canonical, aliases] of Object.entries(DEPARTMENT_ALIASES)) {
+    for (const alias of aliases) {
+      if (normalizeDepartmentName(alias) === normalized) {
+        return canonical;
+      }
+    }
+  }
+  
+  return null;
+};
+
 export const getCatalogByKey = (key: string) =>
   PROGRAMME_COURSE_CATALOGS.find((c) => c.key === key);
 
-export const getCatalogsByDepartment = (department: string) =>
-  PROGRAMME_COURSE_CATALOGS.filter((c) => c.department === department);
+export const getCatalogsByDepartment = (department: string) => {
+  // Try exact match first
+  const exactMatch = PROGRAMME_COURSE_CATALOGS.filter((c) => c.department === department);
+  if (exactMatch.length > 0) return exactMatch;
+  
+  // Try canonical department name
+  const canonical = getCanonicalDepartment(department);
+  if (canonical) {
+    return PROGRAMME_COURSE_CATALOGS.filter((c) => 
+      c.department === canonical || getCanonicalDepartment(c.department) === canonical
+    );
+  }
+  
+  return [];
+};
+
+// Export helper for use in components
+export { getCanonicalDepartment, normalizeDepartmentName };

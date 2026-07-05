@@ -1,10 +1,12 @@
 const router = require("express").Router();
 const ctrl = require("../controllers/authController");
 const { authenticate } = require("../middleware/auth");
+const upload = require("../middleware/upload");
 router.post("/register", ctrl.register);
 router.post("/login", ctrl.login);
 router.get("/me", authenticate, ctrl.me);
 router.post("/change-password", authenticate, ctrl.changePassword);
+router.post("/upload-avatar", authenticate, upload.single("avatar"), ctrl.uploadAvatar);
 router.post("/admin/reset-password", authenticate, ctrl.adminResetPassword);
 router.post("/admin/set-password", authenticate, ctrl.adminSetPassword);
 router.post("/admin/create-staff", authenticate, ctrl.adminCreateStaff);

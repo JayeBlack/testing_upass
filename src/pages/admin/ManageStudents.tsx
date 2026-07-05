@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, ApiError } from "@/lib/api";
-import { PROGRAMME_COURSE_CATALOGS } from "@/data/programmeCourses";
 
 interface Student {
   id: string;
@@ -17,6 +16,19 @@ interface Student {
   program_name: string;
   department_name: string;
   status: string;
+}
+
+interface Department {
+  id: number;
+  name: string;
+}
+
+interface Program {
+  id: number;
+  name: string;
+  code: string;
+  department_id: number;
+  department_name: string;
 }
 
 const ManageStudents = () => {
@@ -33,39 +45,44 @@ const ManageStudents = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", index: "", email: "", program: "", department: "", cohort: "January" });
+  const [dbDepartments, setDbDepartments] = useState<Department[]>([]);
+  const [dbPrograms, setDbPrograms] = useState<Program[]>([]);
 
-  // Get unique departments and programmes from course catalogs
-  const availableDepartments = useMemo(() => {
-    const depts = [...new Set(PROGRAMME_COURSE_CATALOGS.map(c => c.department))];
-    return depts.sort();
-  }, []);
-
-  const availableProgrammes = useMemo(() => {
-    if (!form.department || !form.cohort) return [];
-    return PROGRAMME_COURSE_CATALOGS
-      .filter(c => 
-        c.department === form.department && 
-        (c.admissionCycle === form.cohort || !c.admissionCycle)
-      )
-      .map(c => ({ label: c.label, cycle: c.admissionCycle }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [form.department, form.cohort]);
+  // Filter programs based on selected department
+  const filteredPrograms = useMemo(() => {
+    if (!form.department) return [];
+    // Find department ID from name
+    const selectedDept = dbDepartments.find(d => d.name === form.department);
+    if (!selectedDept) return [];
+    // Filter programs by department_id
+    return dbPrograms.filter(prog => prog.department_id === selectedDept.id);
+  }, [form.department, dbPrograms, dbDepartments]);
 
   const load = async () => {
     setLoading(true);
     try {
       const data = await apiFetch<any>("/students");
       setStudents(Array.isArray(data) ? data : data?.data ?? []);
-    } catch {
-      // backend offline
+      
+      // Fetch actual departments from database
+      const depts = await apiFetch<Department[]>("/departments");
+      console.log("Fetched departments:", depts);
+      const activeDepts = depts.sort((a, b) => a.name.localeCompare(b.name));
+      console.log("Active departments:", activeDepts);
+      setDbDepartments(activeDepts);
+      
+      // Fetch actual programs from database
+      const progs = await apiFetch<Program[]>("/programs");
+      console.log("Fetched programs:", progs);
+      setDbPrograms(progs);
+    } catch (err) {
+      console.error("Load error:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { load(); }, []);
-
-  const departments = [...new Set(students.map((s) => s.department_name).filter(Boolean))];
 
   const filtered = students.filter((s) => {
     const name = `${s.first_name || ""} ${s.last_name || ""}`.trim().toLowerCase();
@@ -131,11 +148,7 @@ const ManageStudents = () => {
       const enrollRes = await apiFetch<{ enrolled: any[]; errors?: string[] }>("/students/enroll-bulk", {
         method: "POST",
         body: JSON.stringify({ 
-          students: parseRes.rows.map((r) => ({ 
-            ...r, 
-            admission_year: new Date().getFullYear(),
-            admission_cycle: "January" // Default to January cohort for bulk upload
-          })) 
+          students: parseRes.rows // Don't override admission_cycle - it's already parsed
         }),
       });
       const msg = enrollRes.errors?.length 
@@ -252,8 +265,8 @@ const ManageStudents = () => {
                     className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none"
                   >
                     <option value="">Select department</option>
-                    {availableDepartments.map((dept) => (
-                      <option key={dept} value={dept}>{dept}</option>
+                    {dbDepartments.map((dept) => (
+                      <option key={dept.id} value={dept.name}>{dept.name}</option>
                     ))}
                   </select>
                 </div>
@@ -266,17 +279,17 @@ const ManageStudents = () => {
                     disabled={!form.department}
                   >
                     <option value="">Select programme</option>
-                    {availableProgrammes.map((prog) => (
-                      <option key={prog.label} value={prog.label}>
-                        {prog.label}
+                    {filteredPrograms.map((prog) => (
+                      <option key={prog.id} value={prog.name}>
+                        {prog.name}
                       </option>
                     ))}
                   </select>
                   {!form.department && (
                     <p className="text-xs text-muted-foreground mt-1">Select department first</p>
                   )}
-                  {form.department && availableProgrammes.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1">No programmes available for {form.cohort} cohort</p>
+                  {form.department && filteredPrograms.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">No programmes found for this department</p>
                   )}
                 </div>
               </div>
@@ -312,7 +325,7 @@ const ManageStudents = () => {
         </div>
         <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
           <option value="all">All Departments</option>
-          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+          {dbDepartments.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
         </select>
       </div>
 

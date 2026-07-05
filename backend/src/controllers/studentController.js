@@ -6,13 +6,61 @@ const XLSX = require("xlsx");
 function generateProgramCode(name) {
   // Convert to uppercase, remove special chars, keep only alphanumeric
   let code = name.toUpperCase().replace(/[^A-Z0-9\s]/g, "").trim();
-  // Take first letters of each word or first 10 chars
-  if (code.includes(" ")) {
-    code = code.split(" ").map(w => w[0]).join("").substring(0, 10);
-  } else {
-    code = code.substring(0, 10);
+  
+  // Special handling for degree types
+  let degreePrefix = '';
+  if (code.startsWith('MSC ')) {
+    degreePrefix = 'MSC-';
+    code = code.substring(4);
+  } else if (code.startsWith('MPHIL ')) {
+    degreePrefix = 'MPHL-';
+    code = code.substring(6);
+  } else if (code.startsWith('PHD ')) {
+    degreePrefix = 'PHD-';
+    code = code.substring(4);
   }
-  return code || "PROG";
+  
+  // Remove common words
+  const words = code.split(" ").filter(w => !['AND', 'OF', 'THE'].includes(w));
+  
+  // Take first letters of each word, up to 8 chars total
+  if (words.length > 1) {
+    code = words.map(w => w[0]).join("");
+  } else {
+    code = words[0] || "PROG";
+  }
+  
+  // Add timestamp suffix to ensure uniqueness
+  const timestamp = Date.now().toString().slice(-4);
+  return degreePrefix + code.substring(0, 6) + timestamp;
+}
+
+// ─── Department Aliases (matches database departments) ────────────────────────────────
+const DEPARTMENT_ALIASES = {
+  "Computer Science and Engineering": ["Computer Science and Engineering", "Computer Science", "CSE", "CS"],
+  "Electrical and Electronic Engineering": ["Electrical and Electronic Engineering", "Electrical Engineering", "Electronic Engineering", "EEE"],
+  "Mathematical Sciences": ["Mathematical Sciences", "Mathematics", "Maths", "Math"],
+  "Geomatic Engineering": ["Geomatic Engineering", "Geomatics"],
+  "Mechanical Engineering": ["Mechanical Engineering", "Mechanical"],
+  "Mining Engineering": ["Mining Engineering", "Mining"],
+  "Geological Engineering": ["Geological Engineering", "Geology", "Geological"],
+  "Minerals Engineering": ["Minerals Engineering", "Mineral Engineering"],
+  "Petroleum Engineering": ["Petroleum Engineering", "Petroleum"],
+  "Petroleum Refining and Petrochemical Engineering": ["Petroleum Refining and Petrochemical Engineering", "Petroleum Refining"],
+  "Management Studies": ["Management Studies", "Management"],
+  "Environmental and Safety Engineering": ["Environmental and Safety Engineering", "Environmental Engineering", "Safety Engineering"],
+};
+
+function getCanonicalDepartment(department) {
+  const normalized = (department || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [canonical, aliases] of Object.entries(DEPARTMENT_ALIASES)) {
+    for (const alias of aliases) {
+      if (alias.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized) {
+        return canonical;
+      }
+    }
+  }
+  return department;
 }
 
 // ─── Programme course catalog (mirrors src/data/programmeCourses.ts) ───────
@@ -251,10 +299,26 @@ const PROGRAMME_COURSES = {
 async function autoRegisterCourses(client, studentId, department, admissionCycle, academicYear) {
   try {
     const cycle = admissionCycle || "January";
-    const deptCourses = PROGRAMME_COURSES[department];
-    if (!deptCourses) return; // no catalog for this department yet
+    
+    // Get canonical department name to handle variations
+    const canonicalDept = getCanonicalDepartment(department);
+    console.log(`[autoRegisterCourses] Original dept: ${department}, Canonical: ${canonicalDept}`);
+    
+    // Try canonical department first, then original
+    let deptCourses = PROGRAMME_COURSES[canonicalDept] || PROGRAMME_COURSES[department];
+    
+    if (!deptCourses) {
+      console.log(`[autoRegisterCourses] No catalog for department: ${department}`);
+      return;
+    }
+    
     const courses = deptCourses[cycle] || deptCourses["January"] || [];
-    if (courses.length === 0) return;
+    if (courses.length === 0) {
+      console.log(`[autoRegisterCourses] No courses for cycle: ${cycle}`);
+      return;
+    }
+
+    console.log(`[autoRegisterCourses] Registering ${courses.length} courses for student ${studentId}`);
 
     for (const course of courses) {
       // find or create course record
@@ -278,6 +342,7 @@ async function autoRegisterCourses(client, studentId, department, admissionCycle
         [studentId, courseId, academicYear]
       );
     }
+    console.log(`[autoRegisterCourses] Successfully registered courses for student ${studentId}`);
   } catch (err) {
     // log but don't block enrollment
     console.error("[autoRegisterCourses] Error:", err.message);
@@ -446,8 +511,7 @@ exports.enroll = async (req, res) => {
       return res.status(409).json({ error: "Email already registered" });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hash = await bcrypt.hash(defaultPwd, salt);
+    const hash = await bcrypt.hash(defaultPwd, 10);
 
     const userInsert = await client.query(
       `INSERT INTO users (email, password_hash, role, first_name, last_name, must_change_password, last_password_change)
@@ -457,19 +521,7 @@ exports.enroll = async (req, res) => {
     );
     const userId = userInsert.rows[0].id;
 
-    // find or create program
-    let programId = null;
-    if (program) {
-      const p = await client.query("SELECT id FROM programs WHERE LOWER(name) = LOWER($1)", [program]);
-      if (p.rows.length > 0) programId = p.rows[0].id;
-      else {
-        const programCode = generateProgramCode(program);
-        const np = await client.query("INSERT INTO programs (name, code, is_active) VALUES ($1, $2, TRUE) RETURNING id", [program, programCode]);
-        programId = np.rows[0].id;
-      }
-    }
-
-    // find or create department
+    // find or create department FIRST
     let deptId = null;
     if (department) {
       const d = await client.query("SELECT id FROM departments WHERE LOWER(name) = LOWER($1)", [department]);
@@ -477,6 +529,18 @@ exports.enroll = async (req, res) => {
       else {
         const nd = await client.query("INSERT INTO departments (name, is_active) VALUES ($1, TRUE) RETURNING id", [department]);
         deptId = nd.rows[0].id;
+      }
+    }
+
+    // find or create program with department_id
+    let programId = null;
+    if (program) {
+      const p = await client.query("SELECT id FROM programs WHERE LOWER(name) = LOWER($1)", [program]);
+      if (p.rows.length > 0) programId = p.rows[0].id;
+      else {
+        const programCode = generateProgramCode(program);
+        const np = await client.query("INSERT INTO programs (name, code, department_id, is_active) VALUES ($1, $2, $3, TRUE) RETURNING id", [program, programCode, deptId]);
+        programId = np.rows[0].id;
       }
     }
 
@@ -641,6 +705,7 @@ exports.parseBulk = async (req, res) => {
       program: ["program", "programme", "course", "programname", "programmename"],
       department: ["department", "dept", "departmentname"],
       cohort: ["cohort", "admissioncycle", "cycle", "intake"],
+      academic_year: ["academicyear", "gradyear", "graduationyear", "year"],
     };
     for (const [field, aliases] of Object.entries(knownCols)) {
       const idx = normalized.findIndex((h) => aliases.includes(h));
@@ -653,6 +718,7 @@ exports.parseBulk = async (req, res) => {
       colMap.program = 3;
       colMap.department = 4;
       colMap.cohort = 5;
+      colMap.academic_year = 6;
     }
 
     // parse rows
@@ -665,6 +731,7 @@ exports.parseBulk = async (req, res) => {
         const programIdx = colMap.program ?? 3;
         const deptIdx = colMap.department ?? 4;
         const cohortIdx = colMap.cohort ?? 5;
+        const academicYearIdx = colMap.academic_year ?? 6;
         
         const cohortVal = (cols[cohortIdx] !== undefined && cols[cohortIdx] !== null) 
           ? String(cols[cohortIdx]).trim().toLowerCase() 
@@ -674,6 +741,27 @@ exports.parseBulk = async (req, res) => {
           cohort = "July";
         }
         
+        // Parse academic year (optional)
+        let academicYear = "";
+        if (cols[academicYearIdx] !== undefined && cols[academicYearIdx] !== null) {
+          const yearVal = String(cols[academicYearIdx]).trim();
+          // Accept formats: "2024/2025", "2024-2025", "24/25", "2024"
+          if (yearVal) {
+            // Normalize to YYYY/YYYY format
+            if (yearVal.match(/^\d{4}[\/\-]\d{4}$/)) {
+              academicYear = yearVal.replace("-", "/");
+            } else if (yearVal.match(/^\d{2}[\/\-]\d{2}$/)) {
+              // Convert 24/25 to 2024/2025
+              const [y1, y2] = yearVal.split(/[\/\-]/);
+              academicYear = `20${y1}/20${y2}`;
+            } else if (yearVal.match(/^\d{4}$/)) {
+              // Convert 2024 to 2024/2025
+              const year = parseInt(yearVal);
+              academicYear = `${year}/${year + 1}`;
+            }
+          }
+        }
+        
         return {
           name: (cols[nameIdx] !== undefined && cols[nameIdx] !== null) ? String(cols[nameIdx]).trim() : "",
           index: (cols[indexIdx] !== undefined && cols[indexIdx] !== null) ? String(cols[indexIdx]).trim() : "",
@@ -681,6 +769,7 @@ exports.parseBulk = async (req, res) => {
           program: (cols[programIdx] !== undefined && cols[programIdx] !== null) ? String(cols[programIdx]).trim() : "",
           department: (cols[deptIdx] !== undefined && cols[deptIdx] !== null) ? String(cols[deptIdx]).trim() : "",
           admission_cycle: cohort,
+          academic_year: academicYear,
         };
       })
       .filter((s) => s && s.name && s.index);
@@ -697,7 +786,7 @@ exports.parseBulk = async (req, res) => {
   }
 };
 
-// POST /api/students/enroll-bulk
+// POST /api/students/enroll-bulk (OPTIMIZED)
 // Accepts: { students: [{ name, email, index, program, department, admission_year }, ...] }
 // Enrolls multiple students at once
 exports.enrollBulk = async (req, res) => {
@@ -709,103 +798,171 @@ exports.enrollBulk = async (req, res) => {
 
     const enrolled = [];
     const errors = [];
+    const client = await db.pool.connect();
 
-    for (let i = 0; i < students.length; i++) {
-      const { name, email, index, program, department, admission_year, admission_cycle } = students[i];
-      if (!name || !email || !index) {
-        errors.push(`Row ${i + 1}: Missing required fields`);
-        continue;
-      }
+    try {
+      await client.query("BEGIN");
 
-      const client = await db.pool.connect();
-      try {
-        const [first_name, ...rest] = name.trim().split(/\s+/);
-        const last_name = rest.join(" ") || "";
-        const defaultPwd = String(index).trim();
+      // Pre-fetch all programs and departments (Quick Win #4)
+      const progs = await client.query("SELECT id, LOWER(name) as name FROM programs");
+      const progMap = {};
+      progs.rows.forEach(p => { progMap[p.name] = p.id; });
 
-        await client.query("BEGIN");
+      const depts = await client.query("SELECT id, LOWER(name) as name FROM departments");
+      const deptMap = {};
+      depts.rows.forEach(d => { deptMap[d.name] = d.id; });
 
-        // check email exists
-        const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
-        if (existing.rows.length > 0) {
-          await client.query("ROLLBACK");
+      // Check existing emails and indexes in bulk
+      const emails = students.map(s => s.email?.trim().toLowerCase()).filter(Boolean);
+      const indexes = students.map(s => String(s.index || '').trim()).filter(Boolean);
+      
+      const existingEmailsResult = await client.query(
+        "SELECT email FROM users WHERE email = ANY($1)",
+        [emails]
+      );
+      const existingEmails = new Set(existingEmailsResult.rows.map(r => r.email));
+
+      const existingIndexesResult = await client.query(
+        "SELECT index_number FROM students WHERE index_number = ANY($1)",
+        [indexes]
+      );
+      const existingIndexes = new Set(existingIndexesResult.rows.map(r => r.index_number));
+
+      // Process students
+      for (let i = 0; i < students.length; i++) {
+        const { name, email, index, program, department, admission_year, admission_cycle, academic_year } = students[i];
+        
+        if (!name || !email || !index) {
+          errors.push(`Row ${i + 1}: Missing required fields`);
+          continue;
+        }
+
+        const emailLower = email.trim().toLowerCase();
+        const indexTrimmed = String(index).trim();
+
+        if (existingEmails.has(emailLower)) {
           errors.push(`Row ${i + 1}: Email already registered`);
           continue;
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(defaultPwd, salt);
+        if (existingIndexes.has(indexTrimmed)) {
+          errors.push(`Row ${i + 1}: Index number already exists`);
+          continue;
+        }
 
-        const userInsert = await client.query(
-          `INSERT INTO users (email, password_hash, role, first_name, last_name, must_change_password, last_password_change)
-           VALUES ($1, $2, 'Student', $3, $4, TRUE, NOW())
-           RETURNING id, email`,
-          [email, hash, first_name, last_name]
-        );
-        const userId = userInsert.rows[0].id;
+        const [first_name, ...rest] = name.trim().split(/\s+/);
+        const last_name = rest.join(" ") || "";
+        const defaultPwd = indexTrimmed;
 
-        // find or create program
-        let programId = null;
-        if (program) {
-          const p = await client.query("SELECT id FROM programs WHERE LOWER(name) = LOWER($1)", [program]);
-          if (p.rows.length > 0) programId = p.rows[0].id;
-          else {
-            const programCode = generateProgramCode(program);
-            const np = await client.query("INSERT INTO programs (name, code, is_active) VALUES ($1, $2, TRUE) RETURNING id", [program, programCode]);
-            programId = np.rows[0].id;
+        // Extract admission year from index number (e.g., UMaT/PG/0001/22 -> 2022)
+        let admYear = admission_year;
+        if (!admYear) {
+          const yearMatch = indexTrimmed.match(/\/(\d{2})$/);
+          if (yearMatch) {
+            const shortYear = parseInt(yearMatch[1]);
+            admYear = shortYear >= 0 && shortYear <= 99 ? (shortYear < 50 ? 2000 + shortYear : 1900 + shortYear) : new Date().getFullYear();
+          } else {
+            admYear = new Date().getFullYear();
           }
         }
 
-        // find or create department
-        let deptId = null;
-        if (department) {
-          const d = await client.query("SELECT id FROM departments WHERE LOWER(name) = LOWER($1)", [department]);
-          if (d.rows.length > 0) deptId = d.rows[0].id;
-          else {
-            const nd = await client.query("INSERT INTO departments (name, is_active) VALUES ($1, TRUE) RETURNING id", [department]);
-            deptId = nd.rows[0].id;
+        // Calculate academic_year for course registration if not provided
+        // Default: admission_year + 2 (typical 2-year MSc program)
+        let courseAcademicYear = academic_year;
+        if (!courseAcademicYear) {
+          const gradYear = parseInt(admYear) + 2;
+          courseAcademicYear = `${gradYear}/${gradYear + 1}`;
+        }
+
+        try {
+          // Quick Win #2: No genSalt needed
+          const hash = await bcrypt.hash(defaultPwd, 10);
+
+          const userInsert = await client.query(
+            `INSERT INTO users (email, password_hash, role, first_name, last_name, must_change_password, last_password_change)
+             VALUES ($1, $2, 'Student', $3, $4, TRUE, NOW())
+             RETURNING id, email`,
+            [emailLower, hash, first_name, last_name]
+          );
+          const userId = userInsert.rows[0].id;
+
+          // Quick Win #4: Lookup from map - Process department FIRST
+          let deptId = null;
+          if (department) {
+            const deptKey = department.trim().toLowerCase();
+            if (deptMap[deptKey]) {
+              deptId = deptMap[deptKey];
+            } else {
+              const nd = await client.query(
+                "INSERT INTO departments (name, is_active) VALUES ($1, TRUE) RETURNING id",
+                [department]
+              );
+              deptId = nd.rows[0].id;
+              deptMap[deptKey] = deptId;
+            }
+          }
+
+          // Quick Win #4: Lookup from map - Process program with department_id
+          let programId = null;
+          if (program) {
+            const progKey = program.trim().toLowerCase();
+            if (progMap[progKey]) {
+              programId = progMap[progKey];
+            } else {
+              const programCode = generateProgramCode(program);
+              const np = await client.query(
+                "INSERT INTO programs (name, code, department_id, is_active) VALUES ($1, $2, $3, TRUE) RETURNING id",
+                [program, programCode, deptId]
+              );
+              programId = np.rows[0].id;
+              progMap[progKey] = programId;
+            }
+          }
+
+          const admCycle = admission_cycle || "January";
+
+          const stud = await client.query(
+            `INSERT INTO students (user_id, index_number, program_id, department_id, admission_year, admission_cycle)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [userId, indexTrimmed, programId, deptId, admYear, admCycle]
+          );
+
+          // fetch full student record
+          const out = await client.query(
+            `SELECT s.*, u.first_name, u.last_name, u.email, p.name AS program_name, d.name AS department_name
+             FROM students s
+             JOIN users u ON s.user_id = u.id
+             LEFT JOIN programs p ON s.program_id = p.id
+             LEFT JOIN departments d ON s.department_id = d.id
+             WHERE s.id = $1`,
+            [stud.rows[0].id]
+          );
+
+          // Auto-register core/mandatory courses
+          await autoRegisterCourses(client, stud.rows[0].id, department, admCycle, courseAcademicYear);
+
+          enrolled.push(out.rows[0]);
+          existingEmails.add(emailLower);
+          existingIndexes.add(indexTrimmed);
+        } catch (err) {
+          if (err.code === "23505") {
+            errors.push(`Row ${i + 1}: Student already exists`);
+          } else {
+            errors.push(`Row ${i + 1}: ${err.message}`);
           }
         }
-
-        const admYear = admission_year || new Date().getFullYear();
-        const admCycle = admission_cycle || "January";
-
-        const stud = await client.query(
-          `INSERT INTO students (user_id, index_number, program_id, department_id, admission_year, admission_cycle)
-           VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-          [userId, index, programId, deptId, admYear, admCycle]
-        );
-
-        // fetch full student record
-        const out = await client.query(
-          `SELECT s.*, u.first_name, u.last_name, u.email, p.name AS program_name, d.name AS department_name
-           FROM students s
-           JOIN users u ON s.user_id = u.id
-           LEFT JOIN programs p ON s.program_id = p.id
-           LEFT JOIN departments d ON s.department_id = d.id
-           WHERE s.id = $1`,
-          [stud.rows[0].id]
-        );
-
-        // Auto-register core/mandatory courses for the new student
-        const academicYear = `${admYear}/${parseInt(admYear) + 1}`;
-        await autoRegisterCourses(client, stud.rows[0].id, department, admCycle, academicYear);
-
-        await client.query("COMMIT");
-        enrolled.push(out.rows[0]);
-      } catch (err) {
-        try { await client.query("ROLLBACK"); } catch {}
-        if (err.code === "23505") {
-          errors.push(`Row ${i + 1}: Student already exists`);
-        } else {
-          errors.push(`Row ${i + 1}: ${err.message}`);
-        }
-      } finally {
-        client.release();
       }
-    }
 
-    res.status(201).json({ enrolled, errors: errors.length > 0 ? errors : undefined });
+      // Quick Win #1: Single COMMIT for all students
+      await client.query("COMMIT");
+      res.status(201).json({ enrolled, errors: errors.length > 0 ? errors : undefined });
+      
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

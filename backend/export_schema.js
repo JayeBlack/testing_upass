@@ -30,23 +30,36 @@ async function exportSchema() {
 -- Generated: ${new Date().toISOString()}
 -- ============================================================
 
--- Drop existing tables (careful!)
--- Uncomment the following lines if you want to recreate tables
--- DROP TABLE IF EXISTS clearance_steps CASCADE;
--- DROP TABLE IF EXISTS fee_records CASCADE;
--- DROP TABLE IF EXISTS grades CASCADE;
--- DROP TABLE IF EXISTS graduands CASCADE;
--- DROP TABLE IF EXISTS student_supervisors CASCADE;
--- DROP TABLE IF EXISTS supervisors CASCADE;
--- DROP TABLE IF EXISTS students CASCADE;
--- DROP TABLE IF EXISTS courses CASCADE;
--- DROP TABLE IF EXISTS programs CASCADE;
--- DROP TABLE IF EXISTS departments CASCADE;
--- DROP TABLE IF EXISTS users CASCADE;
-
 BEGIN;
 
+-- Create ENUM types
 `;
+      
+      // Export ENUM types first
+      const enumsResult = await client.query(`
+        SELECT n.nspname as schema, t.typname as typename, e.enumlabel
+        FROM pg_type t 
+        JOIN pg_enum e ON t.oid = e.enumtypid  
+        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+        WHERE n.nspname = 'public'
+        ORDER BY t.typname, e.enumsortorder
+      `);
+      
+      const enumsByType = {};
+      enumsResult.rows.forEach(row => {
+        if (!enumsByType[row.typename]) {
+          enumsByType[row.typename] = [];
+        }
+        enumsByType[row.typename].push(row.enumlabel);
+      });
+      
+      for (const [typeName, labels] of Object.entries(enumsByType)) {
+        console.log(`Processing ENUM: ${typeName}`);
+        schemaSQL += `DROP TYPE IF EXISTS ${typeName} CASCADE;\n`;
+        schemaSQL += `CREATE TYPE ${typeName} AS ENUM (${labels.map(l => `'${l}'`).join(', ')});\n\n`;
+      }
+      
+      schemaSQL += `\n-- Create Tables\n`;
       
       for (const row of tablesResult.rows) {
         const tableName = row.table_name;
@@ -100,7 +113,7 @@ BEGIN;
       schemaSQL += `\nCOMMIT;\n`;
       
       // Write to file
-      const outputPath = path.join(__dirname, 'schema_export.sql');
+      const outputPath = path.join(__dirname, 'migrations', 'schema_export.sql');
       fs.writeFileSync(outputPath, schemaSQL);
       
       console.log(`\n✅ Schema exported to: ${outputPath}\n`);

@@ -54,7 +54,7 @@ exports.getAll = async (req, res) => {
     if (status === "cleared") { sql += " AND f.is_cleared = TRUE"; }
     if (status === "owing") { sql += " AND f.is_cleared = FALSE"; }
     if (search) {
-      sql += ` AND (u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx} OR s.index_number ILIKE $${idx})`;
+      sql += ` AND (u.first_name ILIKE $${idx} OR u.last_name ILIKE $${idx} OR CONCAT(u.first_name, ' ', u.last_name) ILIKE $${idx} OR s.index_number ILIKE $${idx})`;
       params.push(`%${search}%`); idx++;
     }
     
@@ -518,7 +518,7 @@ exports.parseBulk = async (req, res) => {
   }
 };
 
-// POST /api/fees/upload-bulk
+// POST /api/fees/upload-bulk (OPTIMIZED)
 // Accepts: { fees: [{ index_number, total_amount, amount_paid, academic_year, semester }, ...] }
 // Creates fee records and payment records for multiple students with their paid amounts
 exports.uploadBulk = async (req, res) => {
@@ -531,109 +531,136 @@ exports.uploadBulk = async (req, res) => {
     const accountantId = req.user?.id;
     const created = [];
     const errors = [];
+    const client = await db.pool.connect();
 
-    for (let i = 0; i < fees.length; i++) {
-      const { index_number, total_amount, amount_paid, academic_year, semester } = fees[i];
-      if (!index_number || !total_amount) {
-        errors.push(`Row ${i + 1}: Missing required fields`);
-        continue;
-      }
+    try {
+      await client.query("BEGIN");
 
-      try {
-        // Find student by index number
-        const student = await db.query(
-          "SELECT id FROM students WHERE index_number = $1",
-          [index_number]
-        );
+      // Quick Win #4: Pre-fetch all students by index number
+      const indexes = fees.map(f => f.index_number).filter(Boolean);
+      const studentsResult = await client.query(
+        "SELECT id, index_number FROM students WHERE index_number = ANY($1)",
+        [indexes]
+      );
+      const studentMap = {};
+      studentsResult.rows.forEach(s => { studentMap[s.index_number] = s.id; });
 
-        if (student.rows.length === 0) {
+      // Quick Win #4: Pre-fetch existing fee records
+      const existingFeesResult = await client.query(
+        `SELECT student_id, academic_year, semester, id, amount_paid, total_amount
+         FROM fee_records
+         WHERE student_id = ANY($1)`,
+        [Object.values(studentMap)]
+      );
+      const feeRecordMap = {};
+      existingFeesResult.rows.forEach(f => {
+        const key = `${f.student_id}_${f.academic_year}_${f.semester}`;
+        feeRecordMap[key] = f;
+      });
+
+      // Process fees
+      for (let i = 0; i < fees.length; i++) {
+        const { index_number, total_amount, amount_paid, academic_year, semester } = fees[i];
+        
+        if (!index_number || !total_amount) {
+          errors.push(`Row ${i + 1}: Missing required fields`);
+          continue;
+        }
+
+        const studentId = studentMap[index_number];
+        if (!studentId) {
           errors.push(`Row ${i + 1}: Student with index ${index_number} not found`);
           continue;
         }
 
-        const studentId = student.rows[0].id;
-        const year = academic_year || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`;
-        const sem = semester || "First";
-        const rawPaid = amount_paid || 0;
-        const credit_balance = rawPaid > total_amount ? rawPaid - total_amount : 0;
+        try {
+          const year = academic_year || `${new Date().getFullYear()}/${new Date().getFullYear() + 1}`;
+          const sem = semester || "First";
+          const rawPaid = amount_paid || 0;
+          const credit_balance = rawPaid > total_amount ? rawPaid - total_amount : 0;
 
-        // Determine status
-        let status = "Unpaid";
-        let is_cleared = false;
-        if (rawPaid >= total_amount) {
-          status = "Paid";
-          is_cleared = true;
-        } else if (rawPaid > 0) {
-          status = "Partial";
-        }
-
-        // Check if record already exists
-        const existing = await db.query(
-          "SELECT id FROM fee_records WHERE student_id = $1 AND academic_year = $2 AND semester = $3",
-          [studentId, year, sem]
-        );
-
-        let feeRecordId;
-
-        if (existing.rows.length > 0) {
-          feeRecordId = existing.rows[0].id;
-          // Add new payment on top of existing amount_paid - use rawPaid to allow overpayment
-          const updatedRecord = await db.query(
-            `UPDATE fee_records SET
-              total_amount = $1,
-              amount_paid = amount_paid + $2,
-              credit_balance = GREATEST((amount_paid + $2) - $1, 0),
-              updated_at = NOW()
-             WHERE id = $3
-             RETURNING amount_paid, total_amount, credit_balance`,
-            [total_amount, rawPaid, feeRecordId]
-          );
-          const newPaid = parseFloat(updatedRecord.rows[0].amount_paid);
-          const newTotal = parseFloat(updatedRecord.rows[0].total_amount);
-          const newCredit = parseFloat(updatedRecord.rows[0].credit_balance);
-          const newStatus = newPaid >= newTotal ? "Paid" : newPaid > 0 ? "Partial" : "Unpaid";
-          const newCleared = newPaid >= newTotal;
-          await db.query(
-            `UPDATE fee_records SET status = $1, is_cleared = $2 WHERE id = $3`,
-            [newStatus, newCleared, feeRecordId]
-          );
-          // Insert or update payment record for this top-up
-          if (rawPaid > 0) {
-            await db.query(
-              `INSERT INTO payments (fee_record_id, amount, payment_method, status, verified_by, verified_at)
-               VALUES ($1, $2, $3, $4, $5, NOW())
-               ON CONFLICT (fee_record_id) DO UPDATE SET
-                 amount = payments.amount + EXCLUDED.amount,
-                 verified_at = NOW()`,
-              [feeRecordId, rawPaid, "bank_transfer", "Verified", accountantId]
-            );
+          // Determine status
+          let status = "Unpaid";
+          let is_cleared = false;
+          if (rawPaid >= total_amount) {
+            status = "Paid";
+            is_cleared = true;
+          } else if (rawPaid > 0) {
+            status = "Partial";
           }
-          created.push({ index_number, id: feeRecordId, total_amount, amount_paid: newPaid, credit_balance: newCredit, status: newStatus });
-        } else {
-          // Create fee record - store actual amount paid (including overpayments)
-          const result = await db.query(
-            `INSERT INTO fee_records (student_id, academic_year, semester, total_amount, amount_paid, credit_balance, status, is_cleared)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING id`,
-            [studentId, year, sem, total_amount, rawPaid, credit_balance, status, is_cleared]
-          );
-          feeRecordId = result.rows[0].id;
-          // Create payment record if amount_paid > 0 (new record only)
-          if (rawPaid > 0) {
-            await db.query(
-              `INSERT INTO payments (fee_record_id, amount, payment_method, status, verified_by, verified_at)
-               VALUES ($1, $2, $3, $4, $5, NOW())`,
-              [feeRecordId, rawPaid, "bank_transfer", "Verified", accountantId]
+
+          const key = `${studentId}_${year}_${sem}`;
+          const existing = feeRecordMap[key];
+          let feeRecordId;
+
+          if (existing) {
+            feeRecordId = existing.id;
+            // Update existing record - DO NOT change total_amount, only add payment
+            const updatedRecord = await client.query(
+              `UPDATE fee_records SET
+                amount_paid = amount_paid + $1,
+                credit_balance = GREATEST((amount_paid + $1) - total_amount, 0),
+                updated_at = NOW()
+               WHERE id = $2
+               RETURNING amount_paid, total_amount, credit_balance`,
+              [rawPaid, feeRecordId]
             );
+            const newPaid = parseFloat(updatedRecord.rows[0].amount_paid);
+            const newTotal = parseFloat(updatedRecord.rows[0].total_amount);
+            const newCredit = parseFloat(updatedRecord.rows[0].credit_balance);
+            const newStatus = newPaid >= newTotal ? "Paid" : newPaid > 0 ? "Partial" : "Unpaid";
+            const newCleared = newPaid >= newTotal;
+            
+            await client.query(
+              `UPDATE fee_records SET status = $1, is_cleared = $2 WHERE id = $3`,
+              [newStatus, newCleared, feeRecordId]
+            );
+            
+            if (rawPaid > 0) {
+              await client.query(
+                `INSERT INTO payments (fee_record_id, amount, payment_method, status, verified_by, verified_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [feeRecordId, rawPaid, "bank_transfer", "Verified", accountantId]
+              );
+            }
+            created.push({ index_number, id: feeRecordId, total_amount: newTotal, amount_paid: newPaid, credit_balance: newCredit, status: newStatus });
+          } else {
+            // Create new fee record
+            const result = await client.query(
+              `INSERT INTO fee_records (student_id, academic_year, semester, total_amount, amount_paid, credit_balance, status, is_cleared)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+               RETURNING id`,
+              [studentId, year, sem, total_amount, rawPaid, credit_balance, status, is_cleared]
+            );
+            feeRecordId = result.rows[0].id;
+            
+            if (rawPaid > 0) {
+              await client.query(
+                `INSERT INTO payments (fee_record_id, amount, payment_method, status, verified_by, verified_at)
+                 VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [feeRecordId, rawPaid, "bank_transfer", "Verified", accountantId]
+              );
+            }
+            created.push({ index_number, id: feeRecordId, total_amount, amount_paid: rawPaid, credit_balance, status });
+            
+            // Update map for subsequent records
+            feeRecordMap[key] = { id: feeRecordId, student_id: studentId, academic_year: year, semester: sem };
           }
-          created.push({ index_number, id: feeRecordId, total_amount, amount_paid: rawPaid, credit_balance, status });
+        } catch (err) {
+          errors.push(`Row ${i + 1}: ${err.message}`);
         }
-      } catch (err) {
-        errors.push(`Row ${i + 1}: ${err.message}`);
       }
-    }
 
-    res.status(201).json({ created, errors: errors.length > 0 ? errors : undefined });
+      // Quick Win #1: Single COMMIT
+      await client.query("COMMIT");
+      res.status(201).json({ created, errors: errors.length > 0 ? errors : undefined });
+      
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

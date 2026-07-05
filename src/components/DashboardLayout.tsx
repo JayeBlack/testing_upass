@@ -10,8 +10,8 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Bell } from "lucide-react";
-import { useEffect, useState } from "react";
+import { LogOut, Bell, Camera, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 interface DashboardLayoutProps {
@@ -19,10 +19,38 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout = ({ children }: DashboardLayoutProps) => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, updateAvatar } = useAuth();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+      const token = localStorage.getItem("umat_sps_token");
+      const res = await fetch(`${API_BASE_URL}/auth/upload-avatar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const base = API_BASE_URL.replace("/api", "");
+      updateAvatar(`${base}${data.avatar_url}?t=${Date.now()}`);
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = "";
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -104,10 +132,20 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  onClick={() => {
-                    logout();
-                    navigate("/");
-                  }}
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="rounded-lg cursor-pointer"
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? (
+                    <Loader2 size={14} className="mr-2 animate-spin" />
+                  ) : (
+                    <Camera size={14} className="mr-2" />
+                  )}
+                  {uploadingAvatar ? "Uploading..." : "Change Profile Photo"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => { logout(); navigate("/"); }}
                   className="text-destructive focus:text-destructive rounded-lg"
                 >
                   <LogOut size={14} className="mr-2" />
@@ -122,6 +160,14 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <main className={`${isMobile ? "p-4 pt-6" : "ml-64 p-8"} animate-fade-in`}>
         {children}
       </main>
+
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleAvatarChange}
+      />
     </div>
   );
 };

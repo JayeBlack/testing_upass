@@ -48,6 +48,4 @@ echo You can now login with:
 echo Email: %email%
 echo Password: %password%
 echo.
-echo Please change your password after first login.
-echo.
 pause

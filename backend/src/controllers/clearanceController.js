@@ -128,10 +128,11 @@ exports.reject = async (req, res) => {
     if (stepRes.rows.length === 0) return res.status(404).json({ error: "Step not found" });
     const step = stepRes.rows[0];
 
+    const reason = req.body.reason || req.body.note || `Rejected by ${req.user.email}`;
     const result = await db.query(
       `UPDATE clearance_steps SET status = 'not_started', note = $1
        WHERE id = $2 RETURNING *`,
-      [req.body.note || `Rejected by ${req.user.email}`, req.params.id]
+      [reason, req.params.id]
     );
 
     const studentQuery = await db.query("SELECT user_id FROM students WHERE id = $1", [step.student_id]);
@@ -139,7 +140,7 @@ exports.reject = async (req, res) => {
       await createNotification(
         studentQuery.rows[0].user_id, "clearance",
         "Clearance Requires Attention",
-        `Your ${step.department} clearance needs attention. Please check details.`,
+        `Your ${step.department} clearance needs attention: ${reason}`,
         "warning"
       );
     }
@@ -204,22 +205,132 @@ exports.bulkApprove = async (req, res) => {
   }
 };
 
+// GET /api/clearance/supervisor/pending — thesis steps pending for this supervisor
+exports.getSupervisorPending = async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+         cs.id, cs.status, cs.note, cs.cleared_at,
+         s.id AS student_id, s.index_number,
+         u.first_name, u.last_name,
+         p.name AS program_name
+       FROM clearance_steps cs
+       JOIN students s ON cs.student_id = s.id
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN programs p ON s.program_id = p.id
+       WHERE cs.department = 'Thesis Submission'
+         AND cs.supervisor_user_id = $1
+         AND cs.status = 'pending'
+       ORDER BY u.last_name, u.first_name`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/clearance/apply/:studentId — student applies, sets all not_started steps to pending
+exports.applyForClearance = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const existing = await db.query("SELECT id FROM clearance_steps WHERE student_id = $1", [studentId]);
+    if (existing.rows.length === 0) return res.status(400).json({ error: "Clearance steps not initialised" });
+
+    await db.query(
+      `UPDATE clearance_steps SET status = 'pending', note = NULL
+       WHERE student_id = $1 AND status = 'not_started'`,
+      [studentId]
+    );
+
+    // Notify the student
+    const studentQuery = await db.query("SELECT user_id FROM students WHERE id = $1", [studentId]);
+    if (studentQuery.rows.length > 0) {
+      await createNotification(
+        studentQuery.rows[0].user_id, "clearance",
+        "Clearance Application Submitted",
+        "Your clearance application has been submitted. Steps are now pending review.",
+        "info"
+      );
+    }
+
+    // Notify Accountants (School Fees)
+    const accountants = await db.query(`SELECT id FROM users WHERE role IN ('Accountant','AccountingAssistant') AND is_active = true`);
+    for (const u of accountants.rows) {
+      await createNotification(u.id, "clearance", "Clearance Pending", "A student has applied for clearance. Please review the School Fees step.", "info");
+    }
+
+    // Notify Registrars / AdminAssistants (Library, Department, ICT)
+    const registrars = await db.query(`SELECT id FROM users WHERE role IN ('Registrar','AdminAssistant') AND is_active = true`);
+    for (const u of registrars.rows) {
+      await createNotification(u.id, "clearance", "Clearance Pending", "A student has applied for clearance. Please review your assigned steps.", "info");
+    }
+
+    // Notify the student's assigned supervisor (Thesis Submission)
+    const supervisorQuery = await db.query(
+      `SELECT u.id FROM student_supervisors ss
+       JOIN supervisors sv ON ss.supervisor_id = sv.id
+       JOIN users u ON sv.user_id = u.id
+       WHERE ss.student_id = $1 AND ss.is_primary = true
+       LIMIT 1`,
+      [studentId]
+    );
+    if (supervisorQuery.rows.length > 0) {
+      await createNotification(
+        supervisorQuery.rows[0].id, "clearance",
+        "Thesis Clearance Pending",
+        "One of your students has applied for graduation clearance. Please review their Thesis Submission step.",
+        "info"
+      );
+    }
+
+    // Notify Dean / ViceDean
+    const deans = await db.query(`SELECT id FROM users WHERE role IN ('Dean','ViceDean') AND is_active = true`);
+    for (const u of deans.rows) {
+      await createNotification(u.id, "clearance", "Clearance Pending", "A student has applied for graduation clearance.", "info");
+    }
+
+    res.json({ message: "Clearance application submitted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // POST /api/clearance/init/:studentId
 exports.initSteps = async (req, res) => {
   try {
+    // Add supervisor_user_id column if it doesn't exist yet
+    await db.query(`
+      ALTER TABLE clearance_steps
+      ADD COLUMN IF NOT EXISTS supervisor_user_id integer REFERENCES users(id) ON DELETE SET NULL
+    `);
+
+    // Look up the student's primary supervisor user_id
+    const supRes = await db.query(
+      `SELECT u.id FROM student_supervisors ss
+       JOIN supervisors sv ON ss.supervisor_id = sv.id
+       JOIN users u ON sv.user_id = u.id
+       WHERE ss.student_id = $1 AND ss.is_primary = true
+       LIMIT 1`,
+      [req.params.studentId]
+    );
+    const supervisorUserId = supRes.rows[0]?.id ?? null;
+
     const steps = [
-      { department: "School Fees",          description: "All outstanding fees must be settled",       step_order: 1 },
-      { department: "Library",              description: "Return all borrowed books and clear fines",   step_order: 2 },
-      { department: "Department",           description: "Academic clearance from your department",     step_order: 3 },
-      { department: "Thesis Submission",    description: "Final bound thesis submitted",                step_order: 4 },
-      { department: "ICT Directorate",      description: "Return all university-issued devices",        step_order: 5 },
-      { department: "Dean of Postgraduate", description: "Final approval from the Dean",                step_order: 6 },
+      { department: "School Fees",          description: "All outstanding fees must be settled",      step_order: 1, sup: null },
+      { department: "Library",              description: "Return all borrowed books and clear fines",  step_order: 2, sup: null },
+      { department: "Department",           description: "Academic clearance from your department",    step_order: 3, sup: null },
+      { department: "Thesis Submission",    description: "Final bound thesis submitted",               step_order: 4, sup: supervisorUserId },
+      { department: "ICT Directorate",      description: "Return all university-issued devices",       step_order: 5, sup: null },
+      { department: "Dean of Postgraduate", description: "Final approval from the Dean",               step_order: 6, sup: null },
     ];
+
     for (const s of steps) {
       await db.query(
-        `INSERT INTO clearance_steps (student_id, department, description, step_order)
-         VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
-        [req.params.studentId, s.department, s.description, s.step_order]
+        `INSERT INTO clearance_steps (student_id, department, description, step_order, supervisor_user_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (student_id, department) DO UPDATE SET supervisor_user_id = EXCLUDED.supervisor_user_id`,
+        [req.params.studentId, s.department, s.description, s.step_order, s.sup]
       );
     }
     res.status(201).json({ message: "Clearance steps initialized" });

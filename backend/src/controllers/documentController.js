@@ -151,6 +151,77 @@ exports.uploadForStudents = async (req, res) => {
   }
 };
 
+// GET /api/documents/transcript/:studentId
+exports.getTranscriptData = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const studentRes = await db.query(
+      `SELECT s.id, s.index_number, s.admission_year, s.status,
+              u.first_name, u.last_name,
+              p.name AS program_name,
+              d.name AS department_name
+       FROM students s
+       JOIN users u ON s.user_id = u.id
+       LEFT JOIN programs p ON s.program_id = p.id
+       LEFT JOIN departments d ON s.department_id = d.id
+       WHERE s.id = $1`,
+      [studentId]
+    );
+    if (studentRes.rows.length === 0) return res.status(404).json({ error: "Student not found" });
+    const student = studentRes.rows[0];
+
+    const gradesRes = await db.query(
+      `SELECT g.academic_year, g.semester, g.marks, g.grade,
+              c.code AS course_code, c.name AS course_name, c.credits
+       FROM grades g
+       JOIN courses c ON g.course_id = c.id
+       WHERE g.student_id = $1
+       ORDER BY g.academic_year, g.semester, c.code`,
+      [student.id]
+    );
+
+    // Group by academic_year + semester
+    const semesterMap = {};
+    for (const row of gradesRes.rows) {
+      const key = `${row.academic_year}|${row.semester}`;
+      if (!semesterMap[key]) semesterMap[key] = { academic_year: row.academic_year, semester: row.semester, courses: [] };
+      semesterMap[key].courses.push({
+        code: row.course_code,
+        name: row.course_name,
+        credits: row.credits,
+        marks: row.marks,
+        grade: row.grade,
+      });
+    }
+
+    res.json({ student, semesters: Object.values(semesterMap) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// POST /api/documents/:id/complete-transcript
+exports.completeTranscript = async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE document_requests SET status = 'Ready', completed_at = NOW(), processed_by = $1 WHERE id = $2 RETURNING *, student_id`,
+      [req.user.id, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: "Request not found" });
+    const studentRes = await db.query(`SELECT user_id FROM students WHERE id = $1`, [result.rows[0].student_id]);
+    if (studentRes.rows.length > 0) {
+      await createNotification(
+        studentRes.rows[0].user_id, 'document', 'Transcript Ready',
+        'Your academic transcript has been generated and is ready. Please contact the Dean\'s office to collect it.',
+        'info'
+      );
+    }
+    res.json({ message: "Transcript marked as ready" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // GET /api/documents/dean/uploads
 // Get all uploads made by dean
 exports.getDeanUploads = async (req, res) => {

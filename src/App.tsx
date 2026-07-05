@@ -23,6 +23,7 @@ import SupervisorResources from "./pages/student/SupervisorResources";
 import AssignedStudents from "./pages/supervisor/AssignedStudents";
 import ReviewSubmissions from "./pages/supervisor/ReviewSubmissions";
 import TemplatesAnnouncements from "./pages/supervisor/TemplatesAnnouncements";
+import ThesisClearance from "./pages/supervisor/ThesisClearance";
 import AIAssistant from "./pages/supervisor/AIAssistant";
 import GradeEntry from "./pages/exams-officer/GradeEntry";
 import GeneratePassList from "./pages/exams-officer/GeneratePassList";
@@ -67,13 +68,14 @@ const App = () => (
             <Route path="/documents" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><DocumentRequests /></RoleGuard></RequireAuth>} />
             <Route path="/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><Clearance /></RoleGuard></RequireAuth>} />
             <Route path="/student/chat" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><ChatAssistant /></RoleGuard></RequireAuth>} />
-            <Route path="/notifications" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><Notifications /></RoleGuard></RequireAuth>} />
+            <Route path="/notifications" element={<RequireAuth><Notifications /></RequireAuth>} />
             <Route path="/supervisor-resources" element={<RequireAuth><RoleGuard allowedRoles={["Student"]}><SupervisorResources /></RoleGuard></RequireAuth>} />
             {/* Supervisor */}
             <Route path="/students" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><AssignedStudents /></RoleGuard></RequireAuth>} />
             <Route path="/submissions" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><ReviewSubmissions /></RoleGuard></RequireAuth>} />
             <Route path="/supervisor/templates" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><TemplatesAnnouncements /></RoleGuard></RequireAuth>} />
             <Route path="/supervisor/ai" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><AIAssistant /></RoleGuard></RequireAuth>} />
+            <Route path="/supervisor/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Supervisor"]}><ThesisClearance /></RoleGuard></RequireAuth>} />
             {/* Admin - Shared with multiple roles */}
             <Route path="/admin/students" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer"]}><ManageStudents /></RoleGuard></RequireAuth>} />
             <Route path="/admin/fees" element={<RequireAuth><RoleGuard allowedRoles={["Admin", "Accountant", "AccountingAssistant", "Dean", "ViceDean", "ExamsOfficer", "Registrar", "AdminAssistant"]}><FeesStatus /></RoleGuard></RequireAuth>} />
@@ -84,7 +86,7 @@ const App = () => (
             <Route path="/admin/users" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><ManageUsers /></RoleGuard></RequireAuth>} />
             <Route path="/admin/assignments" element={<RequireAuth><RoleGuard allowedRoles={["Admin"]}><SupervisorAssignments /></RoleGuard></RequireAuth>} />
             {/* Dean */}
-            <Route path="/dean/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><ClearanceApprovals /></RoleGuard></RequireAuth>} />
+            <Route path="/dean/clearance" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean", "Accountant", "AccountingAssistant", "Registrar", "AdminAssistant"]}><ClearanceApprovals /></RoleGuard></RequireAuth>} />
             <Route path="/dean/results" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><CWAResults /></RoleGuard></RequireAuth>} />
             <Route path="/dean/documents" element={<RequireAuth><RoleGuard allowedRoles={["Dean", "ViceDean"]}><DeanDocuments /></RoleGuard></RequireAuth>} />
             {/* Accountant */}

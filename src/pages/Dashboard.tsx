@@ -78,7 +78,7 @@ const Dashboard = () => {
 
   // Live data states
   const [feeSummary, setFeeSummary] = useState<FeeSummary | null>(null);
-  const [analyticsOverview, setAnalyticsOverview] = useState<{ total_students: number; active_students: number } | null>(null);
+  const [analyticsOverview, setAnalyticsOverview] = useState<{ total_students: number; active_students: number; graduands_eligible?: number } | null>(null);
   const [studentFeeData, setStudentFeeData] = useState<any[]>([]);
   const [activeCoursesCount, setActiveCoursesCount] = useState("—");
   const [resultsBatches, setResultsBatches] = useState<any[]>([]);
@@ -112,8 +112,7 @@ const Dashboard = () => {
     if (user?.role !== "Admin" && user?.role !== "Dean" && user?.role !== "ViceDean" && user?.role !== "Registrar" && user?.role !== "AdminAssistant") return;
     return fetchWithInterval(async () => {
       try {
-        // Dean/ViceDean are super admin (per useAdminDepartment), so no dept filter needed
-        const data = await apiFetch<{ total_students: number; active_students: number }>("/analytics/overview");
+        const data = await apiFetch<{ total_students: number; active_students: number; graduands_eligible: number }>("/analytics/overview");
         setAnalyticsOverview(data);
       } catch { /* ignore */ }
     }, 15000);
@@ -242,7 +241,7 @@ const Dashboard = () => {
   // fall back to feeSummary (counts students WITH fee records), then local DataStore.
   const totalStudents = analyticsOverview?.total_students ?? feeSummary?.total_students ?? deptStudents.length;
   const activeStudents = analyticsOverview?.active_students ?? deptStudents.filter((s) => s.status === "Active").length;
-  const totalGraduands = deptGraduands.filter((g) => g.status === "Eligible").length;
+  const totalGraduands = analyticsOverview?.graduands_eligible ?? deptGraduands.filter((g) => g.status === "Eligible").length;
   const feesClearedPct = feeSummary?.compliance_rate ?? 0;
 
   // Student computed data - always calculate
@@ -434,7 +433,7 @@ const Dashboard = () => {
     : user?.role === "AdminAssistant"
     ? ["Manage Students", "View Fees", "Generate List"]
     : user?.role === "Accountant" || user?.role === "AccountingAssistant"
-    ? ["Fee Analytics", "Student Fees", "Export Reports", "Fee Notices"]
+    ? ["Fee Analytics", "Student Fees", "Approve Clearance", "Export Reports"]
     : user?.role === "ExamsOfficer"
     ? ["Enter Grades", "Pass List", "Publish Results", "View Analytics"]
     : isSuperAdmin
@@ -450,7 +449,11 @@ const Dashboard = () => {
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">
-          Welcome back, {user?.name} 😊
+          {(() => {
+            const h = new Date().getHours();
+            const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+            return `${greeting}, ${user?.name}.`;
+          })()}
         </h1>
         <p className="text-sm text-muted-foreground mt-1.5">
           {user?.role === "Student" && `${user.program} · ${user.department}`}

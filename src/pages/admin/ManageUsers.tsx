@@ -52,19 +52,19 @@ const ManageUsers = () => {
 
   if (!user?.isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [usersData, deptsData] = await Promise.all([
         apiFetch<SystemUser[]>("/users"),
         apiFetch<{ id: number; name: string }[]>("/departments")
       ]);
-      setUsers(usersData || []);
-      setDepartments(deptsData?.map(d => d.name) || []);
+      if (usersData) setUsers(usersData);
+      if (deptsData) setDepartments(deptsData.map(d => d.name));
     } catch {
-      // backend offline
+      // backend offline — keep existing data
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -152,6 +152,7 @@ const ManageUsers = () => {
       toast({ title: "Passwords don't match", description: "Please ensure both passwords match", variant: "destructive" });
       return;
     }
+    setSaving(true);
     try {
       await apiFetch("/auth/admin/set-password", { 
         method: "POST", 
@@ -166,6 +167,8 @@ const ManageUsers = () => {
       setConfirmPassword("");
     } catch (err) {
       toast({ title: "Failed", description: err instanceof ApiError ? err.message : "Error", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -418,9 +421,9 @@ const ManageUsers = () => {
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword} 
                     onChange={(e) => setNewPassword(e.target.value)} 
+                    autoComplete="new-password"
                     className="w-full mt-1 px-4 pr-11 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" 
                     placeholder="Enter new password (min. 6 characters)"
-                    autoFocus
                   />
                   <button
                     type="button"
@@ -438,6 +441,7 @@ const ManageUsers = () => {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword} 
                     onChange={(e) => setConfirmPassword(e.target.value)} 
+                    autoComplete="new-password"
                     className="w-full mt-1 px-4 pr-11 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none" 
                     placeholder="Re-enter password"
                   />

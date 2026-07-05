@@ -28,7 +28,8 @@ import umatLogo from "@/assets/umat-logo.png";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 
 interface NavItem {
   label: string;
@@ -45,6 +46,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Financial Status", path: "/finances", icon: <Banknote size={18} /> },
     { label: "Request Documents", path: "/documents", icon: <FileText size={18} /> },
     { label: "Clearance", path: "/clearance", icon: <Shield size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
     { label: "SPS Assistant", path: "/student/chat", icon: <Bot size={18} /> },
     { label: "Resources & Notices", path: "/supervisor-resources", icon: <BookOpen size={18} /> },
   ],
@@ -52,8 +54,10 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { label: "Assigned Students", path: "/students", icon: <Users size={18} /> },
     { label: "Review Submissions", path: "/submissions", icon: <Eye size={18} /> },
+    { label: "Thesis Clearance", path: "/supervisor/clearance", icon: <ShieldCheck size={18} /> },
     { label: "Templates & Notices", path: "/supervisor/templates", icon: <FileText size={18} /> },
     { label: "AI Assistant", path: "/supervisor/ai", icon: <MessageSquare size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   Admin: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
@@ -62,6 +66,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Fees Status", path: "/admin/fees", icon: <Banknote size={18} /> },
     { label: "Document Requests", path: "/admin/documents", icon: <FileText size={18} /> },
     { label: "Generate Pass List", path: "/admin/passlist", icon: <ListChecks size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   Dean: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
@@ -71,13 +76,16 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Document Requests", path: "/dean/documents", icon: <FileText size={18} /> },
     { label: "Pass List", path: "/admin/passlist", icon: <ListChecks size={18} /> },
     { label: "CWA Results", path: "/dean/results", icon: <BarChart3 size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   Accountant: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { label: "Fee Analytics", path: "/accountant/analytics", icon: <PieChart size={18} /> },
     { label: "Student Fees", path: "/admin/fees", icon: <Banknote size={18} /> },
+    { label: "Clearance Approvals", path: "/dean/clearance", icon: <ClipboardCheck size={18} /> },
     { label: "Export Reports", path: "/accountant/reports", icon: <FileText size={18} /> },
     { label: "Fee Notices", path: "/accountant/announcements", icon: <Bell size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   ExamsOfficer: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
@@ -87,6 +95,7 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Analytics", path: "/admin/analytics", icon: <PieChart size={18} /> },
     { label: "Students", path: "/admin/students", icon: <Users size={18} /> },
     { label: "Fees Status", path: "/admin/fees", icon: <Banknote size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   ViceDean: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
@@ -96,24 +105,31 @@ const navByRole: Record<UserRole, NavItem[]> = {
     { label: "Document Requests", path: "/dean/documents", icon: <FileText size={18} /> },
     { label: "Pass List", path: "/admin/passlist", icon: <ListChecks size={18} /> },
     { label: "CWA Results", path: "/dean/results", icon: <BarChart3 size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   Registrar: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { label: "Manage Students", path: "/admin/students", icon: <Users size={18} /> },
+    { label: "Clearance Approvals", path: "/dean/clearance", icon: <ClipboardCheck size={18} /> },
     { label: "Document Requests", path: "/admin/documents", icon: <FileText size={18} /> },
     { label: "Pass List", path: "/admin/passlist", icon: <ListChecks size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   AdminAssistant: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { label: "Manage Students", path: "/admin/students", icon: <Users size={18} /> },
+    { label: "Clearance Approvals", path: "/dean/clearance", icon: <ClipboardCheck size={18} /> },
     { label: "Document Requests", path: "/admin/documents", icon: <FileText size={18} /> },
     { label: "Fee Notices", path: "/accountant/announcements", icon: <Bell size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
   AccountingAssistant: [
     { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={18} /> },
     { label: "Student Fees", path: "/admin/fees", icon: <Banknote size={18} /> },
+    { label: "Clearance Approvals", path: "/dean/clearance", icon: <ClipboardCheck size={18} /> },
     { label: "Fee Analytics", path: "/accountant/analytics", icon: <PieChart size={18} /> },
     { label: "Export Reports", path: "/accountant/reports", icon: <FileText size={18} /> },
+    { label: "Notifications", path: "/notifications", icon: <Bell size={18} /> },
   ],
 };
 
@@ -121,6 +137,20 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetch = async () => {
+      try {
+        const data = await apiFetch<{ count: number }>("/notifications/unread-count");
+        setUnreadCount(data.count || 0);
+      } catch { /* ignore */ }
+    };
+    fetch();
+    const id = setInterval(fetch, 10000);
+    return () => clearInterval(id);
+  }, [user?.id]);
 
   if (!user) return null;
 
@@ -196,7 +226,13 @@ const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => {
                 {item.icon}
               </span>
               <span className="flex-1 text-left">{item.label}</span>
-              {isActive && <ChevronRight size={14} className="text-sidebar-primary/60" />}
+              {item.path === "/notifications" && unreadCount > 0 && (
+                <span className="min-w-[18px] h-[18px] rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center px-1">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+              {isActive && item.path !== "/notifications" && <ChevronRight size={14} className="text-sidebar-primary/60" />}
+              {isActive && item.path === "/notifications" && unreadCount === 0 && <ChevronRight size={14} className="text-sidebar-primary/60" />}
             </button>
           );
         })}

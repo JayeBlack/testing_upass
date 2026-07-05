@@ -23,10 +23,6 @@ Each suggestion must be actionable, professional, and concretely reference the s
 Format each suggestion as a JSON array of objects with "text" (the feedback) and "category" (one of: "content", "formatting", "references", "methodology", "clarity").
 Return ONLY the JSON array, no other text.`,
 
-  checks: `You are an AI assistant that performs automated quality checks on thesis submissions.
-Based on the submission details provided, identify potential issues.
-Return a JSON array of objects with "issue" (description), "severity" (one of: "high", "medium", "low"), and "section" (affected area).
-Return ONLY the JSON array, no other text.`,
 };
 
 serve(async (req) => {

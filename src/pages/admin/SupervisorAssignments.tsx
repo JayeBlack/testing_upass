@@ -48,6 +48,9 @@ const SupervisorAssignments = () => {
   const [supervisorId, setSupervisorId] = useState("");
   const [isPrimary, setIsPrimary] = useState(true);
   const [deptFilter, setDeptFilter] = useState("all");
+  const [tableSearch, setTableSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [saving, setSaving] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [supervisorSearch, setSupervisorSearch] = useState("");
@@ -81,14 +84,31 @@ const svArray = Array.isArray(supervisorsData)
 
   useEffect(() => { load(); }, []);
 
-  const departments = useMemo(
-    () => [...new Set([...students.map((s) => s.department_name), ...supervisors.map((s) => s.department_name)].filter(Boolean))],
-    [students, supervisors]
-  );
+  const [departments, setDepartments] = useState<string[]>([]);
 
-  const rows = useMemo(() => {
+  useEffect(() => {
+    // Fetch departments from database instead of deriving from students/supervisors
+    const fetchDepartments = async () => {
+      try {
+        const data = await apiFetch<any>("/departments");
+        const depts = Array.isArray(data) ? data : data?.data ?? [];
+        setDepartments(depts.map((d: any) => d.name).sort());
+      } catch {
+        // fallback to deriving from students/supervisors
+        const derived = [...new Set([...students.map((s) => s.department_name), ...supervisors.map((s) => s.department_name)].filter(Boolean))];
+        setDepartments(derived.sort());
+      }
+    };
+    if (students.length > 0 || supervisors.length > 0) {
+      fetchDepartments();
+    }
+  }, [students, supervisors]);
+
+  const allRows = useMemo(() => {
+    const q = tableSearch.toLowerCase();
     return students
       .filter((s) => deptFilter === "all" || s.department_name === deptFilter)
+      .filter((s) => !q || `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) || s.index_number.toLowerCase().includes(q))
       .map((s) => {
         const links = assignments
           .filter((a) => a.student_id === s.id)
@@ -98,7 +118,10 @@ const svArray = Array.isArray(supervisorsData)
           });
         return { student: s, links };
       });
-  }, [students, assignments, supervisors, deptFilter]);
+  }, [students, assignments, supervisors, deptFilter, tableSearch]);
+
+  const totalPages = Math.max(1, Math.ceil(allRows.length / PAGE_SIZE));
+  const rows = allRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const handleAssign = async () => {
     if (!studentId || !supervisorId) {
@@ -152,9 +175,15 @@ const svArray = Array.isArray(supervisorsData)
           </p>
         </div>
         <div className="flex gap-3">
+          <input
+            value={tableSearch}
+            onChange={(e) => { setTableSearch(e.target.value); setCurrentPage(1); }}
+            placeholder="Search by name or index..."
+            className="px-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring w-56"
+          />
           <select
             value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
+            onChange={(e) => { setDeptFilter(e.target.value); setCurrentPage(1); }}
             className="px-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             <option value="all">All Departments</option>
@@ -233,6 +262,52 @@ const svArray = Array.isArray(supervisorsData)
           )}
         </div>
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 px-1">
+          <p className="text-sm text-muted-foreground">
+            Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, allRows.length)} of {allRows.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+              .reduce<(number | string)[]>((acc, p, i, arr) => {
+                if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("...");
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                typeof p === "string" ? (
+                  <span key={`e${i}`} className="px-2 text-muted-foreground">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setCurrentPage(p)}
+                    className={`min-w-[36px] h-9 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === p ? "gradient-gold text-secondary-foreground" : "border border-border text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>

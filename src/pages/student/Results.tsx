@@ -194,7 +194,7 @@ const Results = () => {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
       doc.text(`${sem.label.toUpperCase()}`, leftX + 2, sy + 5.5);
-      doc.text(`CWA: ${sem.cwa.toFixed(1)}%`, pageW - 22, sy + 5.5, { align: "right" });
+      doc.text(`CWA: ${sem.cwa.toFixed(2)}%`, pageW - 22, sy + 5.5, { align: "right" });
       doc.setTextColor(0, 0, 0);
 
       autoTable(doc, {
@@ -339,7 +339,7 @@ const Results = () => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Overall CWA</p>
-            <p className="text-2xl font-bold font-display text-foreground">{overallCwa.toFixed(1)}%</p>
+            <p className="text-2xl font-bold font-display text-foreground">{overallCwa.toFixed(2)}%</p>
           </div>
         </div>
         {semesterData.map((sem, i) => {
@@ -356,7 +356,7 @@ const Results = () => {
                   {diff !== null && <span className="text-xs font-medium">{diff >= 0 ? "+" : ""}{diff.toFixed(1)}</span>}
                 </div>
               </div>
-              <p className="text-xl font-bold font-display text-foreground">{sem.cwa.toFixed(1)}%</p>
+              <p className="text-xl font-bold font-display text-foreground">{sem.cwa.toFixed(2)}%</p>
               <p className="text-xs text-muted-foreground mt-0.5">{sem.courses.length} courses</p>
             </div>
           );
@@ -365,23 +365,30 @@ const Results = () => {
 
       <div className="bg-card rounded-xl border border-border p-6 mb-6">
         <h2 className="font-display font-bold text-foreground mb-5">CWA Performance Analysis</h2>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={semesterData.map((s) => ({ name: s.short, cwa: parseFloat(s.cwa.toFixed(1)) }))}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-              <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" }} />
-              <Bar dataKey="cwa" radius={[6, 6, 0, 0]}>
-                {semesterData.map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border flex items-center justify-between">
-          <span className="text-sm font-medium text-foreground">Overall CWA</span>
-          <span className="text-lg font-bold text-foreground">{overallCwa.toFixed(1)}%</span>
-        </div>
+        {(() => {
+          const chartData = semesterData.map((s) => ({ name: s.short, cwa: parseFloat(s.cwa.toFixed(2)) }));
+          return (
+            <>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", color: "hsl(var(--foreground))" }} />
+                    <Bar dataKey="cwa" radius={[6, 6, 0, 0]}>
+                      {semesterData.map((_, i) => <Cell key={i} fill="hsl(var(--primary))" />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="mt-4 p-3 rounded-lg bg-muted/50 border border-border flex items-center justify-between">
+                <span className="text-sm font-medium text-foreground">Overall CWA</span>
+                <span className="text-lg font-bold text-foreground">{overallCwa.toFixed(2)}%</span>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       <div className="space-y-6">
@@ -397,7 +404,7 @@ const Results = () => {
               <div className="flex items-center gap-3">
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Semester CWA</p>
-                  <p className="text-lg font-bold font-display text-foreground">{sem.cwa.toFixed(1)}%</p>
+                  <p className="text-lg font-bold font-display text-foreground">{sem.cwa.toFixed(2)}%</p>
                 </div>
                 <button
                   onClick={() => handleDownload(sem)}

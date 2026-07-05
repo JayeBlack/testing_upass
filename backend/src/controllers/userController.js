@@ -143,7 +143,7 @@ exports.parseBulk = async (req, res) => {
   }
 };
 
-// POST /api/users/create-bulk
+// POST /api/users/create-bulk (OPTIMIZED)
 exports.createBulk = async (req, res) => {
   try {
     const { users } = req.body;
@@ -153,76 +153,104 @@ exports.createBulk = async (req, res) => {
 
     const created = [];
     const errors = [];
+    const client = await db.pool.connect();
 
-    for (let i = 0; i < users.length; i++) {
-      const { name, email, role, department, phone } = users[i];
-      if (!name || !email) {
-        errors.push(`Row ${i + 1}: Missing name or email`);
-        continue;
-      }
+    try {
+      await client.query("BEGIN");
 
-      const client = await db.pool.connect();
-      try {
-        const [first_name, ...rest] = name.trim().split(/\s+/);
-        const last_name = rest.join(" ") || first_name;
+      // Pre-fetch all departments (Quick Win #4)
+      const depts = await client.query("SELECT id, LOWER(name) as name FROM departments");
+      const deptMap = {};
+      depts.rows.forEach(d => { deptMap[d.name] = d.id; });
+
+      // Check existing emails in bulk
+      const emails = users.map(u => u.email?.trim().toLowerCase()).filter(Boolean);
+      const existingResult = await client.query(
+        "SELECT email FROM users WHERE email = ANY($1)",
+        [emails]
+      );
+      const existingEmails = new Set(existingResult.rows.map(r => r.email));
+
+      // Process users
+      for (let i = 0; i < users.length; i++) {
+        const { name, email, role, department, phone } = users[i];
+        
+        if (!name || !email) {
+          errors.push(`Row ${i + 1}: Missing name or email`);
+          continue;
+        }
+
         const emailLower = email.trim().toLowerCase();
-        const defaultPwd = emailLower.split('@')[0];
-
-        await client.query("BEGIN");
-
-        const existing = await client.query("SELECT id FROM users WHERE email = $1", [emailLower]);
-        if (existing.rows.length > 0) {
-          await client.query("ROLLBACK");
+        
+        if (existingEmails.has(emailLower)) {
           errors.push(`Row ${i + 1}: Email already registered`);
           continue;
         }
 
-        const salt = await bcrypt.genSalt(10);
-        const hash = await bcrypt.hash(defaultPwd, salt);
+        const [first_name, ...rest] = name.trim().split(/\s+/);
+        const last_name = rest.join(" ") || first_name;
+        const defaultPwd = emailLower.split('@')[0];
+        
+        // Quick Win #2: No genSalt needed
+        const hash = await bcrypt.hash(defaultPwd, 10);
 
+        // Quick Win #4: Lookup department from map
         let deptId = null;
         if (department && department.trim()) {
-          const d = await client.query("SELECT id FROM departments WHERE LOWER(name) = LOWER($1)", [department]);
-          if (d.rows.length > 0) deptId = d.rows[0].id;
-          else {
-            const nd = await client.query("INSERT INTO departments (name, is_active) VALUES ($1, TRUE) RETURNING id", [department]);
+          const deptKey = department.trim().toLowerCase();
+          if (deptMap[deptKey]) {
+            deptId = deptMap[deptKey];
+          } else {
+            const nd = await client.query(
+              "INSERT INTO departments (name, is_active) VALUES ($1, TRUE) RETURNING id",
+              [department.trim()]
+            );
             deptId = nd.rows[0].id;
+            deptMap[deptKey] = deptId;
           }
         }
 
         const userRole = role || "Supervisor";
-        const userInsert = await client.query(
-          `INSERT INTO users (email, password_hash, role, first_name, last_name, phone, department_id, must_change_password, last_password_change)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, NOW())
-           RETURNING id, email, role, first_name, last_name`,
-          [emailLower, hash, userRole, first_name, last_name, phone || null, deptId]
-        );
-
-        // Auto-create supervisors record for Supervisor role
-        if (userRole === "Supervisor") {
-          const staffId = emailLower.split("@")[0].toUpperCase();
-          await client.query(
-            `INSERT INTO supervisors (user_id, staff_id, department_id, is_active)
-             VALUES ($1, $2, $3, TRUE) ON CONFLICT DO NOTHING`,
-            [userInsert.rows[0].id, staffId, deptId]
+        
+        try {
+          const userInsert = await client.query(
+            `INSERT INTO users (email, password_hash, role, first_name, last_name, phone, department_id, must_change_password, last_password_change)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, NOW())
+             RETURNING id, email, role, first_name, last_name`,
+            [emailLower, hash, userRole, first_name, last_name, phone || null, deptId]
           );
-        }
 
-        await client.query("COMMIT");
-        created.push(userInsert.rows[0]);
-      } catch (err) {
-        try { await client.query("ROLLBACK"); } catch {}
-        if (err.code === "23505") {
-          errors.push(`Row ${i + 1}: User already exists`);
-        } else {
-          errors.push(`Row ${i + 1}: ${err.message}`);
+          // Auto-create supervisors record for Supervisor role
+          if (userRole === "Supervisor") {
+            const staffId = emailLower.split("@")[0].toUpperCase();
+            await client.query(
+              `INSERT INTO supervisors (user_id, staff_id, department_id, is_active)
+               VALUES ($1, $2, $3, TRUE) ON CONFLICT DO NOTHING`,
+              [userInsert.rows[0].id, staffId, deptId]
+            );
+          }
+
+          created.push(userInsert.rows[0]);
+          existingEmails.add(emailLower);
+        } catch (err) {
+          if (err.code === "23505") {
+            errors.push(`Row ${i + 1}: User already exists`);
+          } else {
+            errors.push(`Row ${i + 1}: ${err.message}`);
+          }
         }
-      } finally {
-        client.release();
       }
-    }
 
-    res.status(201).json({ created, errors: errors.length > 0 ? errors : undefined });
+      // Quick Win #1: Single COMMIT for all users
+      await client.query("COMMIT");
+      res.status(201).json({ created, errors: errors.length > 0 ? errors : undefined });
+      
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

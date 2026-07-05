@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FileText, Clock, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { FileText, Clock, CheckCircle, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -72,9 +72,6 @@ const ManageDocuments = () => {
           <h1 className="text-3xl font-bold font-display text-foreground">Document Requests</h1>
           <p className="text-muted-foreground mt-1">Process and manage student document requests</p>
         </div>
-        <button onClick={() => load()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
-          <RefreshCw size={14} /> Refresh
-        </button>
       </div>
 
       {/* Stats */}

@@ -1,14 +1,10 @@
 import React from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Bot, Send, Sparkles, Loader2, ThumbsUp, ThumbsDown, AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { Bot, Send, Sparkles, Loader2, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supervisor-ai`;
 
@@ -276,18 +272,7 @@ const AIAssistant = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="chat" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="chat">
-            <Bot size={14} className="mr-1.5" /> Chat Assistant
-          </TabsTrigger>
-          <TabsTrigger value="checks">
-            <AlertTriangle size={14} className="mr-1.5" /> Automated Checks
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ── Chat Tab ── */}
-        <TabsContent value="chat" className="space-y-4">
+      <div className="space-y-4">
           {messages.length === 0 && (
             <div className="bg-card rounded-xl border border-border p-6">
               <div className="text-center mb-5">
@@ -372,92 +357,8 @@ const AIAssistant = () => {
               </Button>
             </div>
           </div>
-        </TabsContent>
-
-        {/* ── Automated Checks Tab ── */}
-        <TabsContent value="checks">
-          <AutomatedChecks />
-        </TabsContent>
-      </Tabs>
-    </DashboardLayout>
-  );
-};
-
-/* ── Automated Checks sub-component ── */
-const severityConfig = {
-  high: { color: "bg-destructive/10 text-destructive", icon: AlertTriangle },
-  medium: { color: "bg-warning/10 text-warning", icon: Info },
-  low: { color: "bg-success/10 text-success", icon: CheckCircle },
-};
-
-
-
-interface RecentSubmission {
-  id: string;
-  student_name: string;
-  stage: string;
-  status: string;
-  submitted_at: string;
-}
-
-const AutomatedChecks = () => {
-  const [subs, setSubs] = useState<RecentSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase
-      .from("thesis_submissions")
-      .select("id, student_name, stage, status, submitted_at")
-      .order("submitted_at", { ascending: false })
-      .limit(10)
-      .then(({ data }) => { setSubs((data as RecentSubmission[]) || []); setLoading(false); });
-  }, []);
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-card rounded-xl border border-border p-5">
-        <div className="flex items-center gap-2 mb-1">
-          <AlertTriangle size={16} className="text-warning" />
-          <h3 className="font-display font-bold text-foreground">Recent Submissions</h3>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Latest thesis submissions from your students. Use the Chat tab to ask the AI for detailed analysis.
-        </p>
       </div>
-
-      {loading ? (
-        <div className="flex items-center justify-center py-10 text-muted-foreground text-sm">
-          <Loader2 size={16} className="animate-spin mr-2" /> Loading...
-        </div>
-      ) : subs.length === 0 ? (
-        <div className="bg-card rounded-xl border border-border p-5 text-center text-sm text-muted-foreground">
-          No submissions yet.
-        </div>
-      ) : (
-        subs.map((s) => {
-          const cfg = s.status === "Pending" ? severityConfig.medium
-            : s.status === "Rejected" ? severityConfig.high
-            : severityConfig.low;
-          const Icon = cfg.icon;
-          return (
-            <div key={s.id} className="bg-card rounded-xl border border-border p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-medium text-foreground">{s.student_name} — {s.stage}</h4>
-                <Badge variant={s.status === "Rejected" ? "destructive" : s.status === "Pending" ? "outline" : "secondary"} className="text-xs">
-                  {s.status}
-                </Badge>
-              </div>
-              <div className={`flex items-center gap-3 p-3 rounded-lg ${cfg.color}`}>
-                <Icon size={14} className="shrink-0" />
-                <p className="text-sm">
-                  Submitted {new Date(s.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
-              </div>
-            </div>
-          );
-        })
-      )}
-    </div>
+    </DashboardLayout>
   );
 };
 

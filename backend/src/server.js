@@ -24,6 +24,7 @@ const announcementRoutes = require("./routes/announcementRoutes");
 const resourceRoutes = require("./routes/resourceRoutes");
 const auditRoutes = require("./routes/auditRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
+const programRoutes = require("./routes/programRoutes");
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/departments", departmentRoutes);
+app.use("/api/programs", programRoutes);
 
 // ── Health check ──
 app.get("/api/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));

@@ -78,6 +78,13 @@ const ClearanceApprovals = () => {
   const [search, setSearch] = useState("");
   const [programFilter, setProgramFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); // all | pending | complete | dean_ready
+
+  // Default Dean/ViceDean to dean_ready filter after user loads
+  useEffect(() => {
+    if (user?.role === "Dean" || user?.role === "ViceDean") {
+      setStatusFilter("dean_ready");
+    }
+  }, [user?.role]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set()); // step ids for bulk
   const [bulkMode, setBulkMode] = useState(false);
@@ -86,6 +93,11 @@ const ClearanceApprovals = () => {
 
   const isDean = user?.role === "Dean" || user?.role === "ViceDean";
   const isAccountant = user?.role === "Accountant" || user?.role === "AccountingAssistant";
+  const isRegistrar = user?.role === "Registrar" || user?.role === "AdminAssistant";
+
+  // Reject reason modal state
+  const [rejectModal, setRejectModal] = useState<{ stepId: string; department: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -147,14 +159,16 @@ const ClearanceApprovals = () => {
     }
   };
 
-  const handleReject = async (stepId: string) => {
+  const handleReject = async (stepId: string, reason: string) => {
     setProcessing(stepId);
     try {
       await apiFetch(`/clearance/${stepId}/reject`, {
         method: "PUT",
-        body: JSON.stringify({ note: `Rejected by ${user?.name}` }),
+        body: JSON.stringify({ reason: reason || `Rejected by ${user?.name}` }),
       });
       toast({ title: "Step Rejected" });
+      setRejectModal(null);
+      setRejectReason("");
       load();
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
@@ -190,7 +204,8 @@ const ClearanceApprovals = () => {
     if (step.status === "cleared") return false;
     if (isDean) return step.department === "Dean of Postgraduate";
     if (isAccountant) return step.department === "School Fees";
-    // Admin, Registrar, AdminAssistant can act on non-Dean steps
+    if (isRegistrar) return ["Library", "Department", "ICT Directorate"].includes(step.department);
+    // Admin can act on all non-Dean steps
     return step.department !== "Dean of Postgraduate";
   };
 
@@ -455,7 +470,7 @@ const ClearanceApprovals = () => {
                                   Approve
                                 </button>
                                 <button
-                                  onClick={() => handleReject(step.id)}
+                                  onClick={() => { setRejectModal({ stepId: step.id, department: step.department }); setRejectReason(""); }}
                                   disabled={isProcessing}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/30 text-destructive text-xs font-medium hover:bg-destructive/10 transition-colors disabled:opacity-50"
                                 >
@@ -472,6 +487,40 @@ const ClearanceApprovals = () => {
               </div>
             );
           })}
+        </div>
+      )}
+      {/* Reject reason modal */}
+      {rejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-card rounded-xl border border-border p-6 w-full max-w-md shadow-xl">
+            <h3 className="text-base font-semibold text-foreground mb-1">Reject Step</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Provide a reason for rejecting <strong>{rejectModal.department}</strong>. The student will be notified.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+              placeholder="e.g. Outstanding library fines not cleared"
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setRejectModal(null); setRejectReason(""); }}
+                className="px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleReject(rejectModal.stepId, rejectReason)}
+                disabled={processing === rejectModal.stepId}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {processing === rejectModal.stepId ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+                Confirm Reject
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </DashboardLayout>

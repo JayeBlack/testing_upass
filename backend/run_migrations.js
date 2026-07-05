@@ -1,28 +1,50 @@
 const { Pool } = require('pg');
-const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 async function runMigrations() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10000,
+  });
   
   try {
     console.log('\n' + '='.repeat(60));
-    console.log('RUNNING DATABASE MIGRATIONS');
+    console.log('POPULATING DEPARTMENTS');
     console.log('='.repeat(60) + '\n');
     
     const client = await pool.connect();
     
     try {
-      // Read and execute the migration file
-      const migrationPath = path.join(__dirname, 'migrations', '001_ensure_departments.sql');
-      const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+      const departments = [
+        'Computer Science and Engineering',
+        'Electrical and Electronic Engineering',
+        'Environmental and Safety Engineering',
+        'Finance Office',
+        'Geological Engineering',
+        'Geomatic Engineering',
+        'Management Studies',
+        'Mathematical Sciences',
+        'Mechanical Engineering',
+        'Minerals Engineering',
+        'Mining Engineering',
+        'Petroleum Engineering',
+        'School of Postgraduate Studies',
+      ];
       
-      console.log('📝 Executing: 001_ensure_departments.sql\n');
+      console.log('📝 Inserting departments...\n');
       
-      await client.query(migrationSQL);
+      for (const dept of departments) {
+        await client.query(
+          `INSERT INTO departments (name, is_active) 
+           VALUES ($1, TRUE) 
+           ON CONFLICT (name) DO NOTHING`,
+          [dept]
+        );
+      }
       
-      console.log('✅ Migration completed successfully!\n');
+      console.log('✅ Departments populated successfully!\n');
       
       // Show final department list
       const result = await client.query('SELECT id, name, is_active FROM departments ORDER BY name');
@@ -32,8 +54,12 @@ async function runMigrations() {
         console.log(`   ${status} [${d.id}] ${d.name}`);
       });
       console.log('\n' + '='.repeat(60));
-      console.log('✅ All migrations complete!');
+      console.log('✅ Complete!');
       console.log('='.repeat(60) + '\n');
+      
+      console.log('💡 Next Step:');
+      console.log('   To populate courses with correct codes matching the frontend,');
+      console.log('   run: node backend/populate_courses.js\n');
       
     } finally {
       client.release();

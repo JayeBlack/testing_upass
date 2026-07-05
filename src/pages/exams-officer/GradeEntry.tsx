@@ -53,6 +53,7 @@ type BatchStatus = "Draft" | "Published";
 
 const currentYear = new Date().getFullYear();
 const academicYearOptions = [
+  `${currentYear - 2}/${currentYear - 1}`,
   `${currentYear - 1}/${currentYear}`,
   `${currentYear}/${currentYear + 1}`,
   `${currentYear + 1}/${currentYear + 2}`,
@@ -65,7 +66,7 @@ const GradeEntry = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [semester, setSemester] = useState("Semester 1");
-  const [academicYear, setAcademicYear] = useState(academicYearOptions[1]);
+  const [academicYear, setAcademicYear] = useState(academicYearOptions[2]); // Default to current year
   const fileRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -151,10 +152,37 @@ const GradeEntry = () => {
       
       setRows((prev) => [...prev, ...newRows]);
       const invalidCount = newRows.filter((r) => !r.valid).length;
-      toast({
-        title: `${newRows.length} rows imported`,
-        description: invalidCount > 0 ? `${invalidCount} rows have validation errors` : "All rows validated successfully",
-      });
+      
+      // Auto-calculate CWA after successful upload
+      if (invalidCount === 0) {
+        // Set rows silently
+        const validRows = newRows.filter((r) => r.valid);
+        const byStudent = validRows.reduce<Record<string, CWAResult>>((acc, r) => {
+          if (!acc[r.indexNumber]) acc[r.indexNumber] = { index: r.indexNumber, name: r.studentName, cwa: 0, courses: [] };
+          const marks = Number(r.marks);
+          const credits = Number(r.credits);
+          acc[r.indexNumber].courses.push({ courseName: r.courseName, credits, marks, grade: marksToGrade(marks) });
+          return acc;
+        }, {});
+        
+        const results: CWAResult[] = Object.values(byStudent).map((s) => {
+          const totalCredits = s.courses.reduce((sum, c) => sum + c.credits, 0);
+          const weighted = s.courses.reduce((sum, c) => sum + c.marks * c.credits, 0);
+          return { ...s, cwa: totalCredits > 0 ? weighted / totalCredits : 0 };
+        });
+        
+        setCwaResults(results);
+        toast({
+          title: `${newRows.length} rows imported`,
+          description: `Ready to publish for ${results.length} student(s)`,
+        });
+      } else {
+        toast({
+          title: `${newRows.length} rows imported`,
+          description: `${invalidCount} rows have validation errors - check the table below`,
+          variant: "destructive"
+        });
+      }
     } catch (err) {
       console.error("Upload error:", err);
       toast({ title: "Import failed", description: (err as Error).message, variant: "destructive" });
@@ -252,6 +280,10 @@ const GradeEntry = () => {
           title: "✅ Results published successfully!", 
           description: `${response.message}. Students can now view their grades.`
         });
+        
+        // Clear the data after successful publish - no preview needed
+        setRows([]);
+        setCwaResults([]);
       }
 
       setBatchId(response.batchId);
@@ -340,7 +372,7 @@ const GradeEntry = () => {
         </div>
       </div>
 
-      {rows.length > 0 && (
+      {rows.length > 0 && rows.some(r => !r.valid) && (
         <div className="bg-card rounded-xl border border-border overflow-hidden mb-6">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -369,7 +401,7 @@ const GradeEntry = () => {
                         <input value={r.studentName} onChange={(e) => updateRow(r.id, "studentName", e.target.value)} placeholder="Student name" className="w-full px-2 py-1.5 rounded border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                       </td>
                       <td className="px-4 py-2">
-                        <input value={r.courseName} onChange={(e) => updateRow(r.id, "courseName", e.target.value)} placeholder="Course name" className="w-full px-2 py-1.5 rounded border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+                        <input value={r.courseName} onChange={(e) => updateRow(r.id, "courseName", e.target.value)} placeholder="Course name" className="w-full min-w-[200px] px-2 py-1.5 rounded border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                       </td>
                       <td className="px-4 py-2">
                         <input type="number" min={1} step={1} value={r.credits} onChange={(e) => updateRow(r.id, "credits", e.target.value)} placeholder="3" className="w-20 px-2 py-1.5 rounded border border-input bg-background text-sm text-foreground text-center focus:outline-none focus:ring-1 focus:ring-ring" />
@@ -399,7 +431,7 @@ const GradeEntry = () => {
         </div>
       )}
 
-      {rows.length > 0 && (
+      {rows.length > 0 && rows.some(r => !r.valid) && (
         <div className="flex gap-3 mb-8 flex-wrap">
           <button onClick={calculateCWA} disabled={!allValid} className="px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
             Calculate CWA
@@ -416,7 +448,7 @@ const GradeEntry = () => {
         </div>
       )}
 
-      {rows.length === 0 && (
+      {rows.length === 0 && cwaResults.length === 0 && (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Upload size={40} className="mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold text-foreground mb-2">No grades entered yet</h3>
@@ -425,37 +457,22 @@ const GradeEntry = () => {
       )}
 
       {cwaResults.length > 0 && (
-        <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <h2 className="font-display text-lg font-bold text-foreground">CWA Results — {semester}, {academicYear}</h2>
-            <span className="text-xs text-muted-foreground">Credit-weighted: Σ(marks × credits) / Σ(credits)</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase">Index</th>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-muted-foreground uppercase">Name</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-muted-foreground uppercase">Courses</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-muted-foreground uppercase">Total Credits</th>
-                  <th className="text-center px-6 py-3 text-xs font-semibold text-muted-foreground uppercase">CWA</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cwaResults.map((r) => {
-                  const totalCredits = r.courses.reduce((s, c) => s + c.credits, 0);
-                  return (
-                    <tr key={r.index} className="border-b border-border last:border-0">
-                      <td className="px-6 py-3 text-sm font-mono text-muted-foreground">{r.index}</td>
-                      <td className="px-6 py-3 text-sm text-foreground">{r.name}</td>
-                      <td className="px-6 py-3 text-sm text-center text-muted-foreground">{r.courses.length}</td>
-                      <td className="px-6 py-3 text-sm text-center text-muted-foreground">{totalCredits}</td>
-                      <td className="px-6 py-3 text-sm text-center font-bold text-foreground">{r.cwa.toFixed(2)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="bg-card rounded-xl border border-border overflow-hidden mb-6">
+          <div className="p-6">
+            <h2 className="font-display text-lg font-bold text-foreground mb-2">Ready to Publish</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              {cwaResults.length} student(s) — {semester}, {academicYear}
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">Results have been validated and CWA calculated. Click Publish to make results visible to students.</p>
+            <div className="flex gap-3">
+              <button onClick={publishResults} disabled={isPublishing} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50">
+                {isPublishing && <Loader2 size={14} className="animate-spin" />}
+                Publish Results
+              </button>
+              <button onClick={deletePublished} disabled={isPublishing} className="px-5 py-2.5 rounded-lg border border-destructive/30 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                Clear Draft
+              </button>
+            </div>
           </div>
         </div>
       )}

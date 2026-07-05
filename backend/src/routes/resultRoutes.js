@@ -4,6 +4,7 @@ const { authenticate, authorize } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 
 router.use(authenticate);
+router.get("/cwa-overview", authorize("Dean", "ViceDean", "Admin", "ExamsOfficer"), ctrl.getCWAOverview);
 router.get("/student/:studentId", ctrl.getByStudent);
 router.get("/cwa/:studentId", ctrl.getCWA);
 router.get("/batches", ctrl.getBatches);

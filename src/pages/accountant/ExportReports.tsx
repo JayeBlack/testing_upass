@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { FileText, Loader2, RefreshCw, Download } from "lucide-react";
+import { FileText, Loader2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { exportData } from "@/lib/exportUtils";
 import { useEffect, useState, useCallback } from "react";
@@ -34,32 +34,27 @@ const ExportReports = () => {
   const { adminDepartment } = useAdminDepartment();
   const [fees, setFees] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [filterYear, setFilterYear] = useState<string>("all");
   const [filterSemester, setFilterSemester] = useState<string>("all");
   const [filterProgram, setFilterProgram] = useState<string>("all");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const loadFees = useCallback(async (showRefreshIndicator = false) => {
-    if (showRefreshIndicator) setRefreshing(true);
-    else setLoading(true);
+  const loadFees = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const response = await apiFetch<{ data: FeeRecord[] } | FeeRecord[]>("/fees?limit=10000");
       const data = Array.isArray(response) ? response : response.data || [];
       setFees(data);
-      setLastUpdated(new Date());
     } catch {
       // backend offline
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   // Auto-refresh every 30 seconds for real-time data
   useEffect(() => {
     loadFees();
-    const interval = setInterval(() => loadFees(true), 30000);
+    const interval = setInterval(() => loadFees(true), 10000);
     return () => clearInterval(interval);
   }, [loadFees]);
 
@@ -78,19 +73,13 @@ const ExportReports = () => {
   const handleExport = async (report: string, format: "csv" | "pdf") => {
     console.log("handleExport called", { report, format, filteredFeesCount: filteredFees.length });
     
-    // Fetch fresh data before generating the report for real-time accuracy
-    setRefreshing(true);
-    let freshFees: FeeRecord[] = [];
+    let freshFees: FeeRecord[] = fees;
     try {
       const response = await apiFetch<{ data: FeeRecord[] } | FeeRecord[]>("/fees?limit=10000");
       freshFees = Array.isArray(response) ? response : response.data || [];
       setFees(freshFees);
-      setLastUpdated(new Date());
     } catch {
       // Use cached data if fetch fails
-      freshFees = fees;
-    } finally {
-      setRefreshing(false);
     }
 
     const freshFiltered = freshFees.filter((f) => {
@@ -197,20 +186,7 @@ const ExportReports = () => {
           <div>
             <h1 className="text-2xl font-bold font-display text-foreground">Export Financial Reports</h1>
             <p className="text-muted-foreground mt-1">Generate and download financial reports from live database records</p>
-            {lastUpdated && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Last updated: {lastUpdated.toLocaleTimeString()} — auto-refreshes every 30s
-              </p>
-            )}
           </div>
-          <button
-            onClick={() => loadFees(true)}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            Refresh
-          </button>
         </div>
 
         <div className="flex flex-wrap gap-3 mt-4">

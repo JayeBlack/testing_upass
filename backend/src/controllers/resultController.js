@@ -343,6 +343,32 @@ exports.enterGrades = async (req, res) => {
   }
 };
 
+// GET /api/results/cwa-overview (all students with computed CWA — for Dean/ViceDean)
+exports.getCWAOverview = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT s.id, u.first_name, u.last_name, s.index_number,
+             p.name AS program_name, d.name AS department_name,
+             s.department_id, s.admission_year,
+             ROUND(SUM(g.marks * c.credits) / NULLIF(SUM(c.credits), 0), 2) AS cwa
+      FROM students s
+      JOIN users u ON s.user_id = u.id
+      LEFT JOIN programs p ON s.program_id = p.id
+      LEFT JOIN departments d ON s.department_id = d.id
+      INNER JOIN grades g ON g.student_id = s.id
+      INNER JOIN courses c ON g.course_id = c.id
+      WHERE g.marks IS NOT NULL AND g.marks > 0 AND c.credits > 0
+      GROUP BY s.id, u.first_name, u.last_name, s.index_number,
+               p.name, d.name, s.department_id, s.admission_year
+      HAVING SUM(c.credits) > 0
+      ORDER BY cwa DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // GET /api/results/cwa/:studentId
 exports.getCWA = async (req, res) => {
   try {

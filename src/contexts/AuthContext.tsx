@@ -39,6 +39,7 @@ interface AuthContextType {
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
+  updateAvatar: (avatarUrl: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -130,6 +131,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const updateAvatar = useCallback((avatarUrl: string) => {
+    setUser((u) => (u ? { ...u, avatarUrl } : u));
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
@@ -150,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, changePassword, logout, refresh }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, loading, login, changePassword, logout, refresh, updateAvatar }}>
       {children}
     </AuthContext.Provider>
   );
