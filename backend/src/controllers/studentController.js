@@ -828,33 +828,24 @@ exports.enrollBulk = async (req, res) => {
       );
       const existingIndexes = new Set(existingIndexesResult.rows.map(r => r.index_number));
 
-      // Process students
+      // Pre-hash all passwords in parallel (major speedup vs sequential bcrypt)
+      const validStudents = [];
       for (let i = 0; i < students.length; i++) {
-        const { name, email, index, program, department, admission_year, admission_cycle, academic_year } = students[i];
-        
-        if (!name || !email || !index) {
-          errors.push(`Row ${i + 1}: Missing required fields`);
-          continue;
-        }
+        const s = students[i];
+        if (!s.name || !s.email || !s.index) { errors.push(`Row ${i + 1}: Missing required fields`); continue; }
+        const emailLower = s.email.trim().toLowerCase();
+        const indexTrimmed = String(s.index).trim();
+        if (existingEmails.has(emailLower)) { errors.push(`Row ${i + 1}: Email already registered`); continue; }
+        if (existingIndexes.has(indexTrimmed)) { errors.push(`Row ${i + 1}: Index number already exists`); continue; }
+        validStudents.push({ ...s, emailLower, indexTrimmed, originalIndex: i });
+      }
 
-        const emailLower = email.trim().toLowerCase();
-        const indexTrimmed = String(index).trim();
+      const hashes = await Promise.all(validStudents.map(s => bcrypt.hash(s.indexTrimmed, 10)));
 
-        if (existingEmails.has(emailLower)) {
-          errors.push(`Row ${i + 1}: Email already registered`);
-          continue;
-        }
+      // Process students
+      for (let i = 0; i < validStudents.length; i++) {
+        const { name, emailLower, indexTrimmed, program, department, admission_year, admission_cycle, academic_year, originalIndex } = validStudents[i];
 
-        if (existingIndexes.has(indexTrimmed)) {
-          errors.push(`Row ${i + 1}: Index number already exists`);
-          continue;
-        }
-
-        const [first_name, ...rest] = name.trim().split(/\s+/);
-        const last_name = rest.join(" ") || "";
-        const defaultPwd = indexTrimmed;
-
-        // Extract admission year from index number (e.g., UMaT/PG/0001/22 -> 2022)
         let admYear = admission_year;
         if (!admYear) {
           const yearMatch = indexTrimmed.match(/\/(\d{2})$/);
@@ -866,17 +857,18 @@ exports.enrollBulk = async (req, res) => {
           }
         }
 
-        // Calculate academic_year for course registration if not provided
-        // Default: admission_year + 2 (typical 2-year MSc program)
         let courseAcademicYear = academic_year;
         if (!courseAcademicYear) {
           const gradYear = parseInt(admYear) + 2;
           courseAcademicYear = `${gradYear}/${gradYear + 1}`;
         }
 
+        const [first_name, ...rest] = name.trim().split(/\s+/);
+        const last_name = rest.join(" ") || "";
+        const defaultPwd = indexTrimmed;
+
         try {
-          // Quick Win #2: No genSalt needed
-          const hash = await bcrypt.hash(defaultPwd, 10);
+          const hash = hashes[i];
 
           const userInsert = await client.query(
             `INSERT INTO users (email, password_hash, role, first_name, last_name, must_change_password, last_password_change)
@@ -946,9 +938,9 @@ exports.enrollBulk = async (req, res) => {
           existingIndexes.add(indexTrimmed);
         } catch (err) {
           if (err.code === "23505") {
-            errors.push(`Row ${i + 1}: Student already exists`);
+            errors.push(`Row ${originalIndex + 1}: Student already exists`);
           } else {
-            errors.push(`Row ${i + 1}: ${err.message}`);
+            errors.push(`Row ${originalIndex + 1}: ${err.message}`);
           }
         }
       }
