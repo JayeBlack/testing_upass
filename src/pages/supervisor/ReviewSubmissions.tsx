@@ -140,11 +140,16 @@ const ReviewSubmissions = () => {
     if (!selectedSubmission) return;
     try {
       const fileUrl = selectedSubmission.file_path.startsWith("http") ? selectedSubmission.file_path : `${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace('/api', '')}${selectedSubmission.file_path}`;
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = fileUrl;
+      a.href = blobUrl;
       a.download = selectedSubmission.file_name;
-      a.target = "_blank";
+      document.body.appendChild(a);
       a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 500);
     } catch (err: any) {
       toast({ title: "Download failed", description: err.message, variant: "destructive" });
     }

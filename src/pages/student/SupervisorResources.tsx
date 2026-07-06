@@ -146,15 +146,26 @@ const SupervisorResources = () => {
                       {r.description && <p className="text-xs text-muted-foreground mt-1">{r.description}</p>}
                     </div>
                   </div>
-                  <a
-                    href={r.file_url}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    onClick={async () => {
+                      try {
+                        const resp = await fetch(r.file_url);
+                        if (!resp.ok) throw new Error("Download failed");
+                        const blob = await resp.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = blobUrl;
+                        a.download = r.file_name;
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 500);
+                      } catch { window.open(r.file_url, "_blank"); }
+                    }}
                     className="shrink-0 p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                     title="Download"
                   >
                     <Download size={18} />
-                  </a>
+                  </button>
                 </div>
               ))}
             </div>

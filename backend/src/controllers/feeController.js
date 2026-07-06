@@ -349,8 +349,7 @@ exports.saveSchedule = async (req, res) => {
 
     const fs = require("fs");
     const path = require("path");
-    // Use process.cwd() which is the backend/ directory when running
-    const uploadDir = path.join(process.cwd(), "uploads", "fee-schedules");
+    const uploadDir = path.join(__dirname, "..", "..", "uploads", "fee-schedules");
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
     const originalName = req.file.originalname || "fee-schedule";

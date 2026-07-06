@@ -179,7 +179,18 @@ const TemplatesAnnouncements = () => {
   };
 
   const downloadResource = async (r: Resource) => {
-    window.open(r.file_url, "_blank");
+    try {
+      const resp = await fetch(r.file_url);
+      if (!resp.ok) throw new Error("Download failed");
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = r.file_name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 500);
+    } catch { window.open(r.file_url, "_blank"); }
   };
 
   const filteredResources = resources

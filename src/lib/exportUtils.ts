@@ -226,10 +226,11 @@ export function exportData({ title, subtitle, headers, rows, fileName, format }:
 
     // ── Paginate ──
     const footerH = 10;
-    let drawnCount = 0;
+    let rowOffset = 0;
     let pageNum = 1;
+    const allRows = rows.slice(); // non-destructive copy
 
-    while (drawnCount < rows.length) {
+    while (rowOffset < allRows.length) {
       if (pageNum > 1) {
         doc.addPage();
         doc.setFontSize(13);
@@ -244,8 +245,14 @@ export function exportData({ title, subtitle, headers, rows, fileName, format }:
         tableTop = 38;
       }
 
+      // Slice only the rows for this page into the shared `rows` ref used by drawTable
+      const pageRows = allRows.slice(rowOffset);
+      // Temporarily replace rows content for drawTable
+      rows.length = 0;
+      pageRows.forEach((r) => rows.push(r));
+
       const rowsOnThisPage = drawTable(tableTop, pageH - footerH);
-      drawnCount += rowsOnThisPage;
+      rowOffset += rowsOnThisPage;
 
       // Footer
       const footerY = pageH - 6;
@@ -254,9 +261,6 @@ export function exportData({ title, subtitle, headers, rows, fileName, format }:
       doc.setTextColor(130, 130, 130);
       doc.text(`Generated: ${new Date().toLocaleString()} — Page ${pageNum}`, MARGIN, footerY);
 
-      if (drawnCount < rows.length) {
-        rows.splice(0, rowsOnThisPage);
-      }
       pageNum++;
     }
 
