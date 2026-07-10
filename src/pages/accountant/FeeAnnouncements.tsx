@@ -424,7 +424,7 @@ const FeeAnnouncements = () => {
               <span className="flex items-center gap-1"><Users size={12} /> {a.recipients} recipients</span>
             </div>
           </div>
-        ))}}
+        ))}
       </div>
     </DashboardLayout>
   );
