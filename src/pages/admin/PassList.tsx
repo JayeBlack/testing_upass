@@ -206,7 +206,6 @@ const PassList = () => {
                   </td>
                 </tr>
               ))}
-              )}
               {!loading && paginatedGraduands.length === 0 && (
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-muted-foreground">
                   No records found. Click "Generate Pass List" (Admin/Dean) or adjust filters.
