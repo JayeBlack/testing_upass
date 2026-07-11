@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiFetch, getToken } from "@/lib/api";
+import { resolveSafeAssetUrl } from "@/lib/safe-url";
 import {
   Upload, FileText, FileType, Archive, Download, Trash2, Filter,
   Send, Calendar, Bell, Clock, Users, User, X,
@@ -179,8 +180,14 @@ const TemplatesAnnouncements = () => {
   };
 
   const downloadResource = async (r: Resource) => {
+    const safeUrl = resolveSafeAssetUrl(r.file_url, window.location.origin);
+    if (!safeUrl) {
+      toast({ title: "Invalid file link", description: "This resource link is not a supported download URL.", variant: "destructive" });
+      return;
+    }
+
     try {
-      const resp = await fetch(r.file_url);
+      const resp = await fetch(safeUrl);
       if (!resp.ok) throw new Error("Download failed");
       const blob = await resp.blob();
       const blobUrl = URL.createObjectURL(blob);
@@ -190,7 +197,9 @@ const TemplatesAnnouncements = () => {
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 500);
-    } catch { window.open(r.file_url, "_blank"); }
+    } catch {
+      toast({ title: "Download failed", description: "The requested file could not be downloaded right now.", variant: "destructive" });
+    }
   };
 
   const filteredResources = resources

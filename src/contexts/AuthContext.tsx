@@ -83,11 +83,15 @@ const mapUser = (u: ApiUser): User => ({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Only cache non-sensitive display fields — security fields (isSuperAdmin, mustChangePassword) come from /auth/me
   const [user, setUser] = useState<User | null>(() => {
     if (typeof window === "undefined") return null;
     try {
       const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as User) : null;
+      if (!raw) return null;
+      const cached = JSON.parse(raw) as User;
+      // Strip security-sensitive fields from cached value — always re-fetched from server
+      return { ...cached, isSuperAdmin: false, mustChangePassword: false };
     } catch {
       return null;
     }
@@ -96,8 +100,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     try {
-      if (user) window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-      else window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      if (user) {
+        // Only persist display fields — never persist security-sensitive flags
+        const { isSuperAdmin: _a, mustChangePassword: _b, ...displayFields } = user;
+        window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(displayFields));
+      } else {
+        window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      }
     } catch {
       /* ignore storage errors */
     }

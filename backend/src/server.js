@@ -29,13 +29,9 @@ const programRoutes = require("./routes/programRoutes");
 const app = express();
 
 // ── Security ──
-// Allow iframe embedding from frontend origins (needed for PDF preview in supervisor submissions)
 const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173").split(",");
+// Apply helmet with secure defaults globally
 app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false,
-  crossOriginOpenerPolicy: false,
-  frameguard: false,
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -49,17 +45,24 @@ app.use(helmet({
     },
   },
 }));
+// Per-route override for PDF preview endpoints that require iframe embedding
+const pdfPreviewHeaders = (req, res, next) => {
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+};
 
 // ── CORS ──
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 
 // ── Rate Limiting ──
-// Skip health check from rate limiting
 app.get("/api/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
-// General: 1000 req/15min per IP
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false }));
-// Auth: 100 login attempts per 15min per IP (still brute-force safe)
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
+// General: 300 req/15min per IP
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
+// Auth: 20 login attempts per 15min per IP
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+// Sensitive data endpoints: 100 req/15min
+const dataLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false });
 
 // ── Parsing & Logging ──
 app.use(express.json({ limit: "10mb" }));
@@ -67,7 +70,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan("dev"));
 
 // ── Static uploads ──
-app.use("/uploads", express.static(process.env.UPLOAD_DIR || "./uploads"));
+// NOTE: /uploads is intentionally NOT served as static — files are served through
+// authenticated controller endpoints to prevent unauthenticated file access.
 
 // ── Routes ──
 app.use("/api/auth", authLimiter, authRoutes);
@@ -77,7 +81,7 @@ app.use("/api/supervisors", supervisorRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/thesis", thesisRoutes);
 app.use("/api/results", resultRoutes);
-app.use("/api/fees", feeRoutes);
+app.use("/api/fees", dataLimiter, feeRoutes);
 app.use("/api/clearance", clearanceRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/notifications", notificationRoutes);

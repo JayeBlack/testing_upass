@@ -63,7 +63,9 @@ export async function apiFetch<T = unknown>(
     res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   } catch (e) {
     throw new ApiError(
-      `Cannot reach API at ${API_BASE_URL}. Is the backend running?`,
+      import.meta.env.PROD
+        ? "Cannot reach the server. Please try again."
+        : `Cannot reach API at ${API_BASE_URL}. Is the backend running?`,
       0,
     );
   };

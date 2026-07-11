@@ -3,9 +3,7 @@ import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Plus, Trash2, CheckCircle, AlertTriangle, FileText, Loader2 } from "lucide-react";
 import { readSheetFile, SHEET_ACCEPT } from "@/lib/sheet-import";
-import { apiFetch } from "@/lib/api";
-
-const SHEET_ACCEPT = ".csv,.xlsx,.xls";
+import { apiFetch, getToken } from "@/lib/api";
 
 interface GradeRow {
   id: string;
@@ -99,7 +97,7 @@ const GradeEntry = () => {
       formData.append("file", file);
 
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-      const token = localStorage.getItem("umat_sps_token");
+      const token = getToken();
 
       if (!token) {
         throw new Error("Not authenticated. Please log in again.");
@@ -115,8 +113,7 @@ const GradeEntry = () => {
 
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.error("Non-JSON response:", text);
+        await response.text();
         throw new Error("Server returned invalid response. Check if backend is running correctly.");
       }
 
@@ -184,7 +181,6 @@ const GradeEntry = () => {
         });
       }
     } catch (err) {
-      console.error("Upload error:", err);
       toast({ title: "Import failed", description: (err as Error).message, variant: "destructive" });
     }
     e.target.value = "";
@@ -192,11 +188,6 @@ const GradeEntry = () => {
 
   const calculateCWA = () => {
     const validRows = rows.filter((r) => r.valid);
-    console.log('=== CALCULATE CWA DEBUG ===');
-    console.log('Total rows:', rows.length);
-    console.log('Valid rows:', validRows.length);
-    console.log('Valid rows data:', validRows);
-    
     if (validRows.length === 0) {
       toast({ title: "No valid grades", description: "Fix validation errors first", variant: "destructive" });
       return;
@@ -209,18 +200,11 @@ const GradeEntry = () => {
       acc[r.indexNumber].courses.push({ courseName: r.courseName, credits, marks, grade: marksToGrade(marks) });
       return acc;
     }, {});
-    
-    console.log('Grouped by student:', byStudent);
-    
     const results: CWAResult[] = Object.values(byStudent).map((s) => {
       const totalCredits = s.courses.reduce((sum, c) => sum + c.credits, 0);
       const weighted = s.courses.reduce((sum, c) => sum + c.marks * c.credits, 0);
       return { ...s, cwa: totalCredits > 0 ? weighted / totalCredits : 0 };
     });
-    
-    console.log('Final CWA results:', results);
-    console.log('========================');
-    
     setCwaResults(results);
     toast({ title: "CWA calculated", description: `Computed for ${results.length} student(s)` });
   };
@@ -243,14 +227,6 @@ const GradeEntry = () => {
         }))
       );
 
-      console.log('=== PUBLISH DEBUG ===');
-      console.log('CWA Results count:', cwaResults.length);
-      console.log('Grades to publish count:', grades.length);
-      console.log('Grades data:', JSON.stringify(grades, null, 2));
-      console.log('Semester:', semester);
-      console.log('Academic Year:', academicYear);
-      console.log('==================');
-
       if (grades.length === 0) {
         toast({ title: "No grades to publish", description: "No grade data available", variant: "destructive" });
         return;
@@ -265,10 +241,7 @@ const GradeEntry = () => {
         }),
       });
 
-      console.log('Publish response:', response);
-
       if (response.errors && response.errors.length > 0) {
-        console.warn('Publish errors:', response.errors);
         const errorMsg = response.errors.slice(0, 3).join('; ');
         toast({ 
           title: "Partially published", 
@@ -289,9 +262,6 @@ const GradeEntry = () => {
       setBatchId(response.batchId);
       setStatus("Published");
     } catch (err) {
-      console.error('=== PUBLISH ERROR ===');
-      console.error('Error:', err);
-      console.error('==================');
       toast({ 
         title: "Publication failed", 
         description: (err as Error).message,

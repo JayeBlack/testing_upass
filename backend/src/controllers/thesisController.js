@@ -4,6 +4,13 @@ const { uploadToCloudinary, useCloudinary } = require("../middleware/upload");
 // GET /api/thesis/student/:studentId
 exports.getByStudent = async (req, res) => {
   try {
+    // IDOR: Students can only view their own thesis
+    if (req.user.role === "Student") {
+      const own = await db.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
+      if (own.rows.length === 0 || String(own.rows[0].id) !== String(req.params.studentId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const result = await db.query(
       "SELECT * FROM thesis_submissions WHERE student_id = $1 ORDER BY submitted_at DESC LIMIT 1",
       [req.params.studentId]
@@ -94,7 +101,9 @@ exports.upload = async (req, res) => {
 // PUT /api/thesis/:id/review
 exports.review = async (req, res) => {
   try {
-    const { status } = req.body; // Approved, Rejected
+    const { status } = req.body;
+    const allowed = ["Approved", "Rejected", "Under Review"];
+    if (!allowed.includes(status)) return res.status(400).json({ error: "Invalid status value" });
     const result = await db.query(
       `UPDATE thesis_submissions SET status = $1, reviewed_at = NOW(), reviewed_by = $2
        WHERE id = $3 RETURNING *`,

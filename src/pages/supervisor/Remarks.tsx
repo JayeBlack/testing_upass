@@ -1,8 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api";
 
 interface FeedbackRecord {
   id: string;
@@ -13,27 +12,23 @@ interface FeedbackRecord {
 }
 
 const Remarks = () => {
-  const { user } = useAuth();
   const [records, setRecords] = useState<FeedbackRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("thesis_submissions")
-        .select("id, student_name, stage, feedback, reviewed_at, reviewed_by")
-        .eq("reviewed_by", user?.name)
-        .not("feedback", "is", null)
-        .order("reviewed_at", { ascending: false });
-
-      if (!error && data) {
-        setRecords(data as FeedbackRecord[]);
+      try {
+        const data = await apiFetch<FeedbackRecord[]>("/thesis/remarks");
+        setRecords(data || []);
+      } catch {
+        setRecords([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
-    if (user?.name) load();
-  }, [user?.name]);
+    load();
+  }, []);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });

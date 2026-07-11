@@ -23,8 +23,8 @@ const ChangePassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPwd.length < 6) {
-      toast({ title: "Password too short", description: "Use at least 6 characters", variant: "destructive" });
+    if (newPwd.length < 8) {
+      toast({ title: "Password too short", description: "Use at least 8 characters", variant: "destructive" });
       return;
     }
     if (newPwd !== confirm) {

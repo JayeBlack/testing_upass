@@ -1,5 +1,8 @@
 const db = require("../db");
 const XLSX = require("xlsx");
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const { createNotification } = require("./notificationController");
 
 // GET /api/fees/student/:studentId — accepts user_id or student_id
@@ -8,19 +11,20 @@ exports.getByStudent = async (req, res) => {
     const paramId = req.params.studentId;
     const requestingUser = req.user;
 
-    // Students can only access their own fees
+    // Students can only access their own fees — always resolve from trusted JWT identity
+    let lookupId;
     if (requestingUser.role === "Student") {
-      if (String(paramId) !== String(requestingUser.id)) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      lookupId = requestingUser.id; // ignore paramId entirely for students
+    } else {
+      lookupId = paramId;
     }
 
-    const studentLookup = await db.query("SELECT id FROM students WHERE user_id = $1", [paramId]);
+    const studentLookup = await db.query("SELECT id FROM students WHERE user_id = $1", [lookupId]);
     let studentId;
     if (studentLookup.rows.length > 0) {
       studentId = studentLookup.rows[0].id;
     } else {
-      studentId = paramId;
+      studentId = lookupId;
     }
     const result = await db.query(
       "SELECT * FROM fee_records WHERE student_id = $1 ORDER BY academic_year DESC, semester",
@@ -92,6 +96,21 @@ exports.getAll = async (req, res) => {
 exports.makePayment = async (req, res) => {
   try {
     const { fee_record_id, amount, payment_method, reference, receipt_url } = req.body;
+    const requestingUser = req.user;
+
+    // CWE-807: verify the fee record belongs to the requesting student
+    if (requestingUser.role === "Student") {
+      const ownership = await db.query(
+        `SELECT fr.id FROM fee_records fr
+         JOIN students s ON fr.student_id = s.id
+         WHERE fr.id = $1 AND s.user_id = $2`,
+        [fee_record_id, requestingUser.id]
+      );
+      if (ownership.rows.length === 0) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     const payment = await db.query(
       `INSERT INTO payments (fee_record_id, amount, payment_method, reference, receipt_url)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
@@ -141,6 +160,10 @@ exports.makePayment = async (req, res) => {
 // PUT /api/fees/:id/clearance
 exports.toggleClearance = async (req, res) => {
   try {
+    const allowedRoles = ["Admin", "SuperAdmin", "Accountant", "AccountingAssistant"];
+    if (!allowedRoles.includes(req.user?.role)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const result = await db.query(
       "UPDATE fee_records SET is_cleared = NOT is_cleared, updated_at = NOW() WHERE id = $1 RETURNING *",
       [req.params.id]
@@ -357,9 +380,8 @@ exports.downloadSchedule = async (req, res) => {
     if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith("." + h))) {
       return res.status(403).json({ error: "URL not allowed" });
     }
-    const https = require("https");
     const fileName = (name || "fee-schedule.xlsx").replace(/[^a-zA-Z0-9._-]/g, "_");
-    https.get(url, (upstream) => {
+    https.get(parsedUrl.href, (upstream) => {
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       res.setHeader("Content-Type", upstream.headers["content-type"] || "application/octet-stream");
       upstream.pipe(res);
@@ -375,19 +397,19 @@ exports.saveSchedule = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     const { uploadToCloudinary, useCloudinary } = require("../middleware/upload");
-    const path = require("path");
 
     let downloadUrl;
     if (useCloudinary) {
       const result = await uploadToCloudinary(req.file.buffer, req.file.originalname, "upass/fee-schedules");
       downloadUrl = result.secure_url;
     } else {
-      const fs = require("fs");
-      const uploadDir = path.join(__dirname, "..", "..", "uploads", "fee-schedules");
+      const uploadDir = path.resolve(__dirname, "..", "..", "uploads", "fee-schedules");
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      const ext = path.extname(req.file.originalname) || ".xlsx";
+      const ext = path.extname(req.file.originalname).replace(/[^a-zA-Z0-9.]/g, "") || ".xlsx";
       const uniqueName = `fee-schedule-${Date.now()}${ext}`;
-      fs.writeFileSync(path.join(uploadDir, uniqueName), req.file.buffer);
+      const filePath = path.resolve(uploadDir, uniqueName);
+      if (!filePath.startsWith(uploadDir)) return res.status(400).json({ error: "Invalid file path" });
+      fs.writeFileSync(filePath, req.file.buffer);
       downloadUrl = `/uploads/fee-schedules/${uniqueName}`;
     }
 
@@ -408,7 +430,6 @@ exports.parseFeeSchedule = async (req, res) => {
     let rows = [];
 
     if (isExcel) {
-      const XLSX = require("xlsx");
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });

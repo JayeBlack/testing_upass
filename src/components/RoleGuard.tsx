@@ -26,8 +26,8 @@ const RoleGuard = ({ children, allowedRoles, redirectTo = "/dashboard" }: RoleGu
   // Check if user's role is in the allowed roles list
   const hasAccess = allowedRoles.includes(user.role);
 
-  // Special case: Super Admin has access to everything
-  if (user.isSuperAdmin && allowedRoles.includes("Admin")) {
+  // SuperAdmin has access to all routes regardless of allowedRoles
+  if (user.isSuperAdmin) {
     return <>{children}</>;
   }
 

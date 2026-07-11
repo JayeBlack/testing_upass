@@ -15,7 +15,7 @@ router.get("/dean/uploads", authorize("Admin", "Dean", "ViceDean"), ctrl.getDean
 router.post("/dean/upload", authorize("Admin", "Dean", "ViceDean"), setDocumentSubdir, upload.single("file"), ctrl.uploadForStudents);
 router.get("/transcript/:studentId", authorize("Admin", "Dean", "ViceDean"), ctrl.getTranscriptData);
 router.post("/:id/complete-transcript", authorize("Admin", "Dean", "ViceDean"), ctrl.completeTranscript);
-router.get("/student/:studentId", ctrl.getByStudent);
-router.post("/", ctrl.create);
+router.get("/student/:studentId", authorize("Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "Student"), ctrl.getByStudent);
+router.post("/", authorize("Student"), ctrl.create);
 router.put("/:id/status", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), ctrl.updateStatus);
 module.exports = router;

@@ -99,9 +99,18 @@ const AIFeedbackPanel = ({ studentName, chapter, fileUrl, fileName, visible, onT
 
       const jsonMatch = fullContent.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
+      const VALID_CATEGORIES = new Set(["content", "formatting", "references", "methodology", "clarity"]);
         const parsed = JSON.parse(jsonMatch[0]);
+        if (!Array.isArray(parsed)) throw new Error("Expected array");
+        const validated = parsed.filter(
+          (s: unknown) => s && typeof s === "object" &&
+            typeof (s as Record<string, unknown>).text === "string" &&
+            typeof (s as Record<string, unknown>).category === "string" &&
+            VALID_CATEGORIES.has((s as Record<string, unknown>).category as string)
+        );
+        if (validated.length === 0) throw new Error("No valid suggestions");
         setSource("live");
-        setSuggestions(parsed.map((s: any) => ({ ...s, helpful: null })));
+        setSuggestions(validated.map((s: { text: string; category: string }) => ({ ...s, helpful: null })));
       } else {
         throw new Error("No JSON array in response");
       }

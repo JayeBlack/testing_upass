@@ -25,6 +25,13 @@ exports.getAll = async (req, res) => {
 // GET /api/documents/student/:studentId
 exports.getByStudent = async (req, res) => {
   try {
+    // IDOR: Students can only view their own documents
+    if (req.user.role === "Student") {
+      const own = await db.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
+      if (own.rows.length === 0 || String(own.rows[0].id) !== String(req.params.studentId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const result = await db.query(
       "SELECT * FROM document_requests WHERE student_id = $1 ORDER BY requested_at DESC",
       [req.params.studentId]
@@ -38,7 +45,11 @@ exports.getByStudent = async (req, res) => {
 // POST /api/documents
 exports.create = async (req, res) => {
   try {
-    const { student_id, doc_type, purpose } = req.body;
+    const { doc_type, purpose } = req.body;
+    // Always derive student_id from the authenticated user — never trust client-supplied student_id
+    const studentRes = await db.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
+    if (studentRes.rows.length === 0) return res.status(404).json({ error: "Student record not found" });
+    const student_id = studentRes.rows[0].id;
     const result = await db.query(
       `INSERT INTO document_requests (student_id, doc_type, purpose) VALUES ($1::integer, $2, $3) RETURNING *`,
       [student_id, doc_type, purpose]

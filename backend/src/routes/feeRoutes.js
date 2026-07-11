@@ -4,8 +4,8 @@ const { authenticate, authorize } = require("../middleware/auth");
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.get("/download-schedule", ctrl.downloadSchedule); // Proxy Cloudinary raw file download — no auth needed (direct browser link)
 router.use(authenticate);
+router.get("/download-schedule", ctrl.downloadSchedule); // Proxy Cloudinary raw file download
 router.get("/student/:studentId", ctrl.getByStudent);
 router.get("/", ctrl.getAll); // All authenticated users can view fees
 router.get("/summary", ctrl.getSummary); // All authenticated users can view summary

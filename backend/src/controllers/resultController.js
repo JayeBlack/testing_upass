@@ -6,8 +6,12 @@ const xlsx = require("xlsx");
 exports.getByStudent = async (req, res) => {
   try {
     const userId = req.params.studentId;
-    
-    // First, find the student record using user_id
+
+    // IDOR: Students can only view their own results
+    if (req.user.role === "Student" && String(userId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     const studentRes = await db.query(
       `SELECT id FROM students WHERE user_id = $1`,
       [userId]
@@ -348,6 +352,10 @@ exports.getCWAOverview = async (req, res) => {
 // GET /api/results/cwa/:studentId
 exports.getCWA = async (req, res) => {
   try {
+    // IDOR: Students can only view their own CWA
+    if (req.user.role === "Student" && String(req.params.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const result = await db.query(
       `SELECT SUM(g.marks * c.credits) / SUM(c.credits) AS cwa
        FROM grades g

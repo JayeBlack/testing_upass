@@ -1,37 +1,20 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { Clock, Filter, Users, Shield, BookOpen, Banknote, FileText } from "lucide-react";
-import { useState } from "react";
+import { Clock, Filter, Users, Shield, BookOpen, Banknote, FileText, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useAdminDepartment } from "@/hooks/use-admin-department";
 import { Navigate } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface LogEntry {
   id: string;
-  timestamp: string;
-  user: string;
-  role: string;
+  created_at: string;
+  actor_name: string;
+  actor_role: string;
   action: string;
-  category: string;
-  department: string;
+  entity: string;
   details: string;
 }
-
-const mockLogs: LogEntry[] = [
-  { id: "l1", timestamp: "2026-04-04 14:32:10", user: "Prof. Kofi Asante", role: "Admin", action: "Enrolled Student", category: "Students", department: "Computer Science", details: "Enrolled Kwame Mensah (UMaT/PG/0500/26) into MSc. IT" },
-  { id: "l2", timestamp: "2026-04-04 13:15:45", user: "Mr. Yaw Darko", role: "Accountant", action: "Cleared Student", category: "Fees", department: "Computer Science", details: "Financial clearance granted for Ama Serwaa (UMaT/PG/0198/22)" },
-  { id: "l3", timestamp: "2026-04-04 11:20:33", user: "Mrs. Akosua Mensah", role: "ExamsOfficer", action: "Published Results", category: "Results", department: "Computer Science", details: "Semester 1 results published for MSc. IT (28 students)" },
-  { id: "l4", timestamp: "2026-04-03 16:45:22", user: "Prof. Ama Boateng", role: "Dean", action: "Approved Clearance", category: "Clearance", department: "Computer Science", details: "Graduation clearance approved for Kofi Darko (UMaT/PG/0089/21)" },
-  { id: "l5", timestamp: "2026-04-03 14:10:18", user: "Mrs. Akosua Mensah", role: "ExamsOfficer", action: "Uploaded Grades", category: "Results", department: "Mining Engineering", details: "CSV grade upload for Mining Engineering (15 students)" },
-  { id: "l6", timestamp: "2026-04-03 10:30:05", user: "Prof. Kofi Asante", role: "Admin", action: "Deleted Student", category: "Students", department: "Computer Science", details: "Removed Yaw Frimpong (UMaT/PG/0178/21) from the system" },
-  { id: "l7", timestamp: "2026-04-02 15:20:40", user: "Mr. Yaw Darko", role: "Accountant", action: "Revoked Clearance", category: "Fees", department: "Computer Science", details: "Financial clearance revoked for Kofi Adjei (UMaT/PG/0345/22)" },
-  { id: "l8", timestamp: "2026-04-02 09:55:12", user: "Mrs. Akosua Mensah", role: "ExamsOfficer", action: "Generated Pass List", category: "Results", department: "Computer Science", details: "Pass list generated for Computer Science (2025)" },
-  { id: "l9", timestamp: "2026-04-01 14:45:30", user: "Dr. Kwesi Mensah", role: "Admin", action: "Bulk Enrollment", category: "Students", department: "Mining Engineering", details: "12 students enrolled via Excel upload for Mining Engineering" },
-  { id: "l10", timestamp: "2026-04-01 11:30:25", user: "Mr. Yaw Darko", role: "Accountant", action: "Sent Fee Notice", category: "Fees", department: "Electrical Engineering", details: "Fee payment reminder sent to 44 students with outstanding balances" },
-  { id: "l11", timestamp: "2026-03-31 16:10:55", user: "Prof. Ama Boateng", role: "Dean", action: "Rejected Clearance", category: "Clearance", department: "Electrical Engineering", details: "Clearance rejected for Efua Dankwah — outstanding fees" },
-  { id: "l12", timestamp: "2026-03-31 10:05:42", user: "Mrs. Akosua Mensah", role: "ExamsOfficer", action: "Deleted Results", category: "Results", department: "Electrical Engineering", details: "Deleted published results for MSc. Electrical Eng Semester 2" },
-];
-
-const categories = [...new Set(mockLogs.map((l) => l.category))];
-const roles = [...new Set(mockLogs.map((l) => l.role))];
 
 const categoryIcons: Record<string, React.ReactNode> = {
   Students: <Users size={14} />,
@@ -41,26 +24,38 @@ const categoryIcons: Record<string, React.ReactNode> = {
 };
 
 const SystemLog = () => {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [catFilter, setCatFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
-  const { isSuperAdmin, adminDepartment } = useAdminDepartment();
+  const { isSuperAdmin } = useAdminDepartment();
+  const { toast } = useToast();
 
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />;
 
-  const filtered = mockLogs.filter((l) => {
-    const matchesCat = catFilter === "all" || l.category === catFilter;
-    const matchesRole = roleFilter === "all" || l.role === roleFilter;
-    const matchesDept = isSuperAdmin || !adminDepartment || l.department === adminDepartment;
-    return matchesCat && matchesRole && matchesDept;
+  useEffect(() => {
+    apiFetch<LogEntry[]>("/audit-logs")
+      .then((data) => setLogs(Array.isArray(data) ? data : []))
+      .catch((error) => {
+        toast({ title: "Failed to load audit logs", description: error instanceof Error ? error.message : "Please try again later.", variant: "destructive" });
+      })
+      .finally(() => setLoading(false));
+  }, [toast]);
+
+  const categories = [...new Set(logs.map((l) => l.entity).filter(Boolean))];
+  const roles = [...new Set(logs.map((l) => l.actor_role).filter(Boolean))];
+
+  const filtered = logs.filter((l) => {
+    const matchesCat = catFilter === "all" || l.entity === catFilter;
+    const matchesRole = roleFilter === "all" || l.actor_role === roleFilter;
+    return matchesCat && matchesRole;
   });
 
   return (
     <DashboardLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-display text-foreground">System Log</h1>
-        <p className="text-muted-foreground mt-1">
-          {isSuperAdmin ? "Track all activities across the system" : `${adminDepartment} — Activity log`}
-        </p>
+        <p className="text-muted-foreground mt-1">Track all activities across the system</p>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -78,30 +73,41 @@ const SystemLog = () => {
         </select>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-4">Showing {filtered.length} of {mockLogs.length} entries</p>
-
-      <div className="space-y-3">
-        {filtered.map((log) => (
-          <div key={log.id} className="bg-card rounded-xl border border-border p-4 flex items-start gap-4">
-            <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
-              {categoryIcons[log.category] || <FileText size={14} />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="text-sm font-medium text-foreground">{log.action}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{log.category}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{log.role}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-secondary/10 text-secondary-foreground">{log.department}</span>
+      {loading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+          <Loader2 size={18} className="animate-spin mr-2" /> Loading audit logs...
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground mb-4">Showing {filtered.length} of {logs.length} entries</p>
+          <div className="space-y-3">
+            {filtered.length === 0 ? (
+              <div className="bg-card rounded-xl border border-border p-12 text-center">
+                <FileText size={36} className="mx-auto text-muted-foreground mb-3" />
+                <p className="text-sm text-muted-foreground">No audit log entries found</p>
               </div>
-              <p className="text-sm text-muted-foreground">{log.details}</p>
-              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1"><Clock size={12} /> {log.timestamp}</span>
-                <span>by {log.user}</span>
+            ) : filtered.map((log) => (
+              <div key={log.id} className="bg-card rounded-xl border border-border p-4 flex items-start gap-4">
+                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                  {categoryIcons[log.entity] || <FileText size={14} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-sm font-medium text-foreground">{log.action}</span>
+                    {log.entity && <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{log.entity}</span>}
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{log.actor_role}</span>
+                  </div>
+                  {log.details && <p className="text-sm text-muted-foreground">{log.details}</p>}
+                  <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Clock size={12} /> {new Date(log.created_at).toLocaleString()}</span>
+                    <span>by {log.actor_name}</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </DashboardLayout>
   );
 };

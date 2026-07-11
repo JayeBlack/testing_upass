@@ -45,10 +45,9 @@ const CourseRegistration = () => {
         </div>
         <div className="bg-card rounded-xl border border-border p-8 text-center">
           <p className="text-muted-foreground mb-4">Loading your programme information...</p>
-          {user && (
+          {import.meta.env.DEV && user && (
             <div className="text-left bg-muted p-4 rounded-lg mb-4">
-              <p className="text-xs font-mono mb-2">Debug Info:</p>
-              <p className="text-xs">Email: {user.email}</p>
+              <p className="text-xs font-mono mb-2">Debug Info (dev only):</p>
               <p className="text-xs">Role: {user.role}</p>
               <p className="text-xs">Department: {studentDepartment || "(not set)"}</p>
               <p className="text-xs">Programme: {studentProgram || "(not set)"}</p>

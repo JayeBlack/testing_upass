@@ -85,12 +85,16 @@ const diskUpload = (() => {
   const uploadDir = process.env.UPLOAD_DIR || "./uploads";
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-      const dir = path.join(uploadDir, req.uploadSubDir || "general");
+      const safeSubDir = (req.uploadSubDir || "general").replace(/[^a-zA-Z0-9_-]/g, "");
+      const base = path.resolve(uploadDir);
+      const dir = path.resolve(base, safeSubDir);
+      if (!dir.startsWith(base)) return cb(new Error("Invalid upload directory"));
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     },
     filename: (req, file, cb) => {
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`);
+      const safeName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`);
     },
   });
   return multer({ storage, limits: { fileSize: maxSize }, fileFilter });

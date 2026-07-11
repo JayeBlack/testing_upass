@@ -345,7 +345,14 @@ exports.uploadResource = async (req, res) => {
     const { title, category, description, student_ids } = req.body;
     if (!title || !category) return res.status(400).json({ error: "Missing required fields" });
 
-    const studentIdArray = student_ids ? JSON.parse(student_ids) : [];
+    let studentIdArray = [];
+    if (student_ids) {
+      try {
+        const parsed = JSON.parse(student_ids);
+        if (!Array.isArray(parsed)) throw new Error("Invalid student_ids");
+        studentIdArray = parsed.filter(id => Number.isInteger(Number(id))).map(Number);
+      } catch { return res.status(400).json({ error: "Invalid student_ids format" }); }
+    }
 
     let fileUrl;
     if (useCloudinary) {
@@ -410,7 +417,14 @@ exports.createAnnouncement = async (req, res) => {
   try {
     const { text, visibility, scheduled_at, student_ids } = req.body;
     if (!text) return res.status(400).json({ error: "Announcement text required" });
-    const studentIdArray = student_ids ? JSON.parse(student_ids) : [];
+    let studentIdArray = [];
+    if (student_ids) {
+      try {
+        const parsed = JSON.parse(student_ids);
+        if (!Array.isArray(parsed)) throw new Error("Invalid student_ids");
+        studentIdArray = parsed.filter(id => Number.isInteger(Number(id))).map(Number);
+      } catch { return res.status(400).json({ error: "Invalid student_ids format" }); }
+    }
 
     const result = await db.query(
       `INSERT INTO announcements (author_id, text, visibility, scheduled_at, recipient_student_ids)

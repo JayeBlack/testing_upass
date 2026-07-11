@@ -153,7 +153,7 @@ const Notifications = () => {
                         <p className="text-xs text-muted-foreground">{n.message}</p>
                         {n.download_url && (
                           <a
-                            href={n.download_url.startsWith("http") ? `${API_BASE_URL}/fees/download-schedule?url=${encodeURIComponent(n.download_url)}&name=fee-schedule.xlsx` : n.download_url}
+                            href={n.download_url.startsWith("https://") ? `${API_BASE_URL}/fees/download-schedule?url=${encodeURIComponent(n.download_url)}&name=fee-schedule.xlsx` : undefined}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"

@@ -14,6 +14,13 @@ const STEP_OWNERS = {
 // GET /api/clearance/student/:studentId
 exports.getByStudent = async (req, res) => {
   try {
+    // IDOR: Students can only view their own clearance steps
+    if (req.user.role === "Student") {
+      const own = await db.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
+      if (own.rows.length === 0 || String(own.rows[0].id) !== String(req.params.studentId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const result = await db.query(
       "SELECT * FROM clearance_steps WHERE student_id = $1 ORDER BY step_order",
       [req.params.studentId]
@@ -102,7 +109,7 @@ exports.approve = async (req, res) => {
     const result = await db.query(
       `UPDATE clearance_steps SET status = 'cleared', cleared_by = $1, cleared_at = NOW()
        WHERE id = $2 RETURNING *`,
-      [req.body.cleared_by || req.user.email, req.params.id]
+      [req.user.email, req.params.id]
     );
 
     const studentQuery = await db.query("SELECT user_id FROM students WHERE id = $1", [step.student_id]);
@@ -181,7 +188,7 @@ exports.bulkApprove = async (req, res) => {
 
         await db.query(
           `UPDATE clearance_steps SET status = 'cleared', cleared_by = $1, cleared_at = NOW() WHERE id = $2`,
-          [cleared_by || req.user.email, id]
+          [req.user.email, id]
         );
 
         const studentQuery = await db.query("SELECT user_id FROM students WHERE id = $1", [step.student_id]);
@@ -234,6 +241,15 @@ exports.getSupervisorPending = async (req, res) => {
 exports.applyForClearance = async (req, res) => {
   try {
     const { studentId } = req.params;
+
+    // IDOR: Students can only apply for their own clearance
+    if (req.user.role === "Student") {
+      const own = await db.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
+      if (own.rows.length === 0 || String(own.rows[0].id) !== String(studentId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     const existing = await db.query("SELECT id FROM clearance_steps WHERE student_id = $1", [studentId]);
     if (existing.rows.length === 0) return res.status(400).json({ error: "Clearance steps not initialised" });
 

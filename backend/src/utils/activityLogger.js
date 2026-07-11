@@ -26,7 +26,7 @@ async function logActivity(userId, action, entity = null, entityId = null, detai
         entity,
         entityId ? String(entityId) : null,
         details ? JSON.stringify(details) : null,
-        ipAddress || '127.0.0.1'
+        ipAddress || null
       ]
     );
   } catch (err) {

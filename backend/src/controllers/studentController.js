@@ -302,23 +302,11 @@ async function autoRegisterCourses(client, studentId, department, admissionCycle
     
     // Get canonical department name to handle variations
     const canonicalDept = getCanonicalDepartment(department);
-    console.log(`[autoRegisterCourses] Original dept: ${department}, Canonical: ${canonicalDept}`);
-    
-    // Try canonical department first, then original
     let deptCourses = PROGRAMME_COURSES[canonicalDept] || PROGRAMME_COURSES[department];
-    
-    if (!deptCourses) {
-      console.log(`[autoRegisterCourses] No catalog for department: ${department}`);
-      return;
-    }
-    
-    const courses = deptCourses[cycle] || deptCourses["January"] || [];
-    if (courses.length === 0) {
-      console.log(`[autoRegisterCourses] No courses for cycle: ${cycle}`);
-      return;
-    }
+    if (!deptCourses) return;
 
-    console.log(`[autoRegisterCourses] Registering ${courses.length} courses for student ${studentId}`);
+    const courses = deptCourses[cycle] || deptCourses["January"] || [];
+    if (courses.length === 0) return;
 
     for (const course of courses) {
       // find or create course record
@@ -342,10 +330,8 @@ async function autoRegisterCourses(client, studentId, department, admissionCycle
         [studentId, courseId, academicYear]
       );
     }
-    console.log(`[autoRegisterCourses] Successfully registered courses for student ${studentId}`);
   } catch (err) {
-    // log but don't block enrollment
-    console.error("[autoRegisterCourses] Error:", err.message);
+    // swallow — don't block enrollment
   }
 }
 
@@ -639,37 +625,23 @@ exports.remove = async (req, res) => {
 // Returns parsed rows: { rows: [{ name, index, email, program, department }, ...] }
 exports.parseBulk = async (req, res) => {
   try {
-    console.log('📥 parseBulk called');
-    console.log('📎 req.file:', req.file ? 'present' : 'missing');
-    
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    
-    console.log('📄 File details:', {
-      name: req.file.originalname,
-      mimetype: req.file.mimetype,
-      size: req.file.buffer ? req.file.buffer.length : 'no buffer'
-    });
-    
+
     const { mimetype, buffer } = req.file;
-    
+
     if (!buffer) {
       return res.status(400).json({ error: "File buffer is empty" });
     }
-    
+
     const isExcel = /\.(xlsx?|xls)$|application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|application\/vnd\.ms-excel/i.test(
       mimetype || req.file.originalname
     );
 
-    console.log('📊 Is Excel file:', isExcel);
-
     let rows = [];
     if (isExcel) {
-      console.log('📖 Reading as Excel...');
       const workbook = XLSX.read(buffer, { type: "buffer" });
-      console.log('📚 Workbook sheets:', workbook.SheetNames);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-      console.log('✅ Parsed', rows.length, 'rows');
     } else {
       const text = buffer.toString("utf-8");
       const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -688,9 +660,6 @@ exports.parseBulk = async (req, res) => {
         return result;
       });
     }
-
-    console.log('📊 Parsed rows count:', rows.length);
-    console.log('📋 First 3 rows:', JSON.stringify(rows.slice(0, 3), null, 2));
 
     if (rows.length < 2) return res.status(400).json({ error: "File must contain header and at least one row" });
 
@@ -784,8 +753,6 @@ exports.parseBulk = async (req, res) => {
 
     res.json({ rows: parsed });
   } catch (err) {
-    console.error('❌ parseBulk error:', err.message);
-    console.error('❌ Stack:', err.stack);
     res.status(500).json({ error: err.message });
   }
 };

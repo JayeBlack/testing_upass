@@ -148,6 +148,7 @@ const SupervisorResources = () => {
                   </div>
                   <button
                     onClick={async () => {
+                      if (!r.file_url.startsWith("https://")) return;
                       try {
                         const resp = await fetch(r.file_url);
                         if (!resp.ok) throw new Error("Download failed");
@@ -159,7 +160,7 @@ const SupervisorResources = () => {
                         document.body.appendChild(a);
                         a.click();
                         setTimeout(() => { URL.revokeObjectURL(blobUrl); document.body.removeChild(a); }, 500);
-                      } catch { window.open(r.file_url, "_blank"); }
+                      } catch { if (r.file_url.startsWith("https://")) window.open(r.file_url, "_blank"); }
                     }}
                     className="shrink-0 p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                     title="Download"

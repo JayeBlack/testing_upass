@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch, logActivity } from "@/lib/api";
+import { resolveSafeAssetUrl } from "@/lib/safe-url";
 
 interface Submission {
   id: string;
@@ -120,7 +121,6 @@ const ReviewSubmissions = () => {
     try {
       // file_path is a full Cloudinary URL in production
       const fileUrl = sub.file_path.startsWith("http") ? sub.file_path : `${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace('/api', '')}${sub.file_path}`;
-      console.log('File preview URL:', fileUrl);
       setPreviewUrl(fileUrl);
       const name = sub.file_name.toLowerCase();
       
@@ -140,7 +140,9 @@ const ReviewSubmissions = () => {
     if (!selectedSubmission) return;
     try {
       const fileUrl = selectedSubmission.file_path.startsWith("http") ? selectedSubmission.file_path : `${(import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api').replace('/api', '')}${selectedSubmission.file_path}`;
-      const response = await fetch(fileUrl);
+      const safeUrl = resolveSafeAssetUrl(fileUrl, window.location.origin);
+      if (!safeUrl) throw new Error("Invalid file URL");
+      const response = await fetch(safeUrl);
       if (!response.ok) throw new Error("Failed to fetch file");
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);

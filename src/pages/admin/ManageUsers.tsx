@@ -144,8 +144,8 @@ const ManageUsers = () => {
 
   const handleResetPassword = async () => {
     if (!resetPasswordUser) return;
-    if (!newPassword || newPassword.trim().length < 6) {
-      toast({ title: "Invalid password", description: "Password must be at least 6 characters", variant: "destructive" });
+    if (!newPassword || newPassword.trim().length < 8) {
+      toast({ title: "Invalid password", description: "Password must be at least 8 characters", variant: "destructive" });
       return;
     }
     if (newPassword !== confirmPassword) {

@@ -8,6 +8,6 @@ router.get("/student/:studentId", ctrl.getByStudent);
 router.get("/pending", authorize("Supervisor", "Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant"), ctrl.getPending);
 router.post("/upload", (req, res, next) => { req.uploadSubDir = "thesis"; next(); }, upload.single("file"), ctrl.upload);
 router.put("/:id/review", authorize("Supervisor"), ctrl.review);
-router.post("/:id/remarks", ctrl.addRemark);
-router.get("/:id/remarks", ctrl.getRemarks);
+router.post("/:id/remarks", authorize("Supervisor", "Admin", "Student"), ctrl.addRemark);
+router.get("/:id/remarks", authorize("Supervisor", "Admin", "Student"), ctrl.getRemarks);
 module.exports = router;

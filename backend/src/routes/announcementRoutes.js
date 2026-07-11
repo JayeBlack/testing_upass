@@ -5,5 +5,5 @@ router.use(authenticate);
 router.get("/", ctrl.getAll);
 router.post("/", authorize("Supervisor", "Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "Accountant"), ctrl.create);
 router.post("/:id/acknowledge", ctrl.acknowledge);
-router.delete("/:id", ctrl.remove);
+router.delete("/:id", authorize("Supervisor", "Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "Accountant"), ctrl.remove);
 module.exports = router;
