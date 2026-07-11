@@ -40,10 +40,14 @@ const AIFeedbackPanel = ({ studentName, chapter, fileUrl, fileName, visible, onT
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   useEffect(() => {
-    if (visible && suggestions.length === 0) {
+    setSuggestions([]);
+  }, [studentName, chapter]);
+
+  useEffect(() => {
+    if (visible && suggestions.length === 0 && !loading) {
       generateSuggestions();
     }
-  }, [visible]);
+  }, [visible, suggestions.length]);
 
   const generateSuggestions = async () => {
     setLoading(true);
