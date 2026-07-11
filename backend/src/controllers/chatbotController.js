@@ -80,8 +80,10 @@ exports.chat = async (req, res) => {
       let students = [];
       try {
         const userId = req.user?.id;
+        console.log(`[Chatbot] supervisor mode — user_id: ${userId}`);
         if (userId) {
           const supRes = await db.query("SELECT id FROM supervisors WHERE user_id = $1", [userId]);
+          console.log(`[Chatbot] supervisor record:`, JSON.stringify(supRes.rows));
           if (supRes.rows.length > 0) {
             const supId = supRes.rows[0].id;
             const stuRes = await db.query(
@@ -103,6 +105,7 @@ exports.chat = async (req, res) => {
               [supId]
             );
             students = stuRes.rows;
+            console.log(`[Chatbot] fetched ${students.length} students:`, students.map(s => s.name));
           }
         }
       } catch (dbErr) {
