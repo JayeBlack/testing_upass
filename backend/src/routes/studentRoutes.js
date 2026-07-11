@@ -3,12 +3,12 @@ const ctrl = require("../controllers/studentController");
 const { authenticate, authorize } = require("../middleware/auth");
 const upload = require("../middleware/upload");
 router.use(authenticate);
-router.get("/me", ctrl.getMyProfile); // Must be before /:id to avoid conflict
-router.get("/by-user/:userId", ctrl.getByUserId);
+router.get("/me", ctrl.getMyProfile);
+router.get("/by-user/:userId", authorize("Admin", "Dean", "ViceDean", "Registrar", "AdminAssistant", "ExamsOfficer", "Accountant", "AccountingAssistant", "Supervisor", "Student"), ctrl.getByUserId);
 router.post("/parse-bulk", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), upload.memory.single("file"), ctrl.parseBulk);
 router.post("/enroll-bulk", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), ctrl.enrollBulk);
 router.post("/enroll", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), ctrl.enroll);
-router.get("/", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant", "ExamsOfficer", "Student", "Accountant", "AccountingAssistant"), ctrl.getAll);
+router.get("/", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant", "ExamsOfficer", "Accountant", "AccountingAssistant"), ctrl.getAll);
 router.get("/:id", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant", "ExamsOfficer"), ctrl.getById);
 router.post("/", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), ctrl.create);
 router.put("/:id", authorize("Admin", "Dean", "ViceDean", "Registrar", "AssistantRegistrar", "AdminAssistant"), ctrl.update);

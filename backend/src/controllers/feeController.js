@@ -6,17 +6,20 @@ const { createNotification } = require("./notificationController");
 exports.getByStudent = async (req, res) => {
   try {
     const paramId = req.params.studentId;
-    // First try to find if this is a users.id — look up the student record
-    const studentLookup = await db.query(
-      "SELECT id FROM students WHERE user_id = $1",
-      [paramId]
-    );
+    const requestingUser = req.user;
+
+    // Students can only access their own fees
+    if (requestingUser.role === "Student") {
+      if (String(paramId) !== String(requestingUser.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    const studentLookup = await db.query("SELECT id FROM students WHERE user_id = $1", [paramId]);
     let studentId;
     if (studentLookup.rows.length > 0) {
-      // It's a users.id — use the corresponding students.id
       studentId = studentLookup.rows[0].id;
     } else {
-      // Try direct student_id match
       studentId = paramId;
     }
     const result = await db.query(
@@ -347,11 +350,16 @@ exports.downloadSchedule = async (req, res) => {
   try {
     const { url, name } = req.query;
     if (!url) return res.status(400).json({ error: "Missing url parameter" });
+    // SSRF protection: only allow Cloudinary URLs
+    const allowedHosts = ["res.cloudinary.com"];
+    let parsedUrl;
+    try { parsedUrl = new URL(url); } catch { return res.status(400).json({ error: "Invalid URL" }); }
+    if (!allowedHosts.some(h => parsedUrl.hostname === h || parsedUrl.hostname.endsWith("." + h))) {
+      return res.status(403).json({ error: "URL not allowed" });
+    }
     const https = require("https");
-    const http = require("http");
     const fileName = (name || "fee-schedule.xlsx").replace(/[^a-zA-Z0-9._-]/g, "_");
-    const client = url.startsWith("https") ? https : http;
-    client.get(url, (upstream) => {
+    https.get(url, (upstream) => {
       res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
       res.setHeader("Content-Type", upstream.headers["content-type"] || "application/octet-stream");
       upstream.pipe(res);

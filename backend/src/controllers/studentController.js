@@ -349,9 +349,13 @@ async function autoRegisterCourses(client, studentId, department, admissionCycle
   }
 }
 
-// GET /api/students/by-user/:userId - Get student by user ID
+// GET /api/students/by-user/:userId
 exports.getByUserId = async (req, res) => {
   try {
+    // Students can only fetch their own profile
+    if (req.user.role === "Student" && String(req.params.userId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const result = await db.query(
       `SELECT s.*, u.first_name, u.last_name, u.email, u.avatar_url,
               p.name AS program_name, d.name AS department_name
