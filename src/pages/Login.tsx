@@ -39,123 +39,124 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen flex items-center justify-center overflow-hidden relative">
       <SEO
         title="Sign in — UMaT Postgraduate Portal"
         description="Sign in to the UMaT School of Postgraduate Studies portal for students, supervisors and staff."
       />
 
-      {/* Left panel — desktop only */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-navy items-center justify-center p-12 relative overflow-hidden">
-        {/* Layered decorative rings */}
-        <div className="absolute top-16 left-16 w-80 h-80 rounded-full border border-white/10" />
-        <div className="absolute top-24 left-24 w-64 h-64 rounded-full border border-white/[0.06]" />
-        <div className="absolute bottom-20 right-12 w-56 h-56 rounded-full border border-white/10" />
-        <div className="absolute bottom-28 right-20 w-40 h-40 rounded-full border border-white/[0.06]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full border border-white/[0.04]" />
-        {/* Faint watermark logo bottom-right */}
-        <img src={umatLogo} alt="" aria-hidden="true" className="absolute bottom-8 right-8 w-40 opacity-[0.06] pointer-events-none select-none" />
-        <div className="relative z-10 text-center max-w-sm">
-          <div className="w-24 h-24 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-8 shadow-2xl ring-1 ring-white/20">
-            <img src={umatLogo} alt="UMaT Logo" className="w-16 h-auto" />
+      {/* Background base — deep forest green */}
+      <div className="absolute inset-0" style={{ background: "hsl(145,65%,11%)" }} />
+
+      {/* Central warm gold spotlight — the hero glow */}
+      <div className="absolute inset-0 animate-float-slow" style={{ background: "radial-gradient(ellipse 80% 70% at 50% 50%, hsl(45,90%,42%,0.28) 0%, transparent 65%)" }} />
+
+      {/* Top-left green bloom */}
+      <div className="absolute -top-32 -left-32 w-[560px] h-[560px] rounded-full blur-[120px] animate-float-slow" style={{ background: "radial-gradient(circle, hsl(145,58%,32%,0.6), transparent 70%)" }} />
+      {/* Bottom-right gold bloom */}
+      <div className="absolute -bottom-36 -right-24 w-[580px] h-[580px] rounded-full blur-[130px] animate-float-slower" style={{ background: "radial-gradient(circle, hsl(42,88%,48%,0.5), transparent 70%)" }} />
+      {/* Top-right amber accent */}
+      <div className="absolute -top-16 right-1/4 w-[320px] h-[320px] rounded-full blur-[100px] animate-float-slow" style={{ background: "radial-gradient(circle, hsl(38,85%,44%,0.22), transparent 70%)" }} />
+      {/* Bottom-left green accent */}
+      <div className="absolute bottom-0 left-1/4 w-[300px] h-[300px] rounded-full blur-[90px] animate-float-slower" style={{ background: "radial-gradient(circle, hsl(145,55%,28%,0.3), transparent 70%)" }} />
+
+      {/* Decorative rings — white on green side, gold-tinted on warm side */}
+      <div className="absolute top-8 left-8 w-72 h-72 rounded-full border border-white/[0.05] animate-float-slow" />
+      <div className="absolute top-16 left-16 w-52 h-52 rounded-full border border-white/[0.03] animate-float-slower" />
+      <div className="absolute bottom-10 right-10 w-80 h-80 rounded-full border border-yellow-300/[0.07] animate-float-slow" />
+      <div className="absolute bottom-18 right-18 w-60 h-60 rounded-full border border-yellow-300/[0.04] animate-float-slower" />
+      {/* Large center ring */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-white/[0.025]" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[820px] h-[820px] rounded-full border border-yellow-200/[0.03]" />
+
+      {/* Watermark logo — bottom right */}
+      <img
+        src={umatLogo}
+        alt=""
+        aria-hidden="true"
+        className="absolute bottom-6 right-8 w-44 opacity-[0.055] pointer-events-none select-none animate-logo-float"
+      />
+
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_55%)] pointer-events-none" />
+      <div className="absolute inset-0 opacity-[0.12] pointer-events-none" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "34px 34px", maskImage: "linear-gradient(180deg, rgba(0,0,0,0.8), transparent 85%)" }} />
+
+      {/* Card — premium glass treatment */}
+      <main className="relative z-10 w-full max-w-[420px] mx-auto px-4">
+        <div className="rounded-[28px] border border-white/70 bg-white/85 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] p-8 sm:p-10 animate-card-enter">
+
+          {/* Branding */}
+          <div className="text-center mb-7">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-4 shadow-sm animate-logo-pulse">
+              <img src={umatLogo} alt="UMaT Logo" className="w-10 h-auto" />
+            </div>
+            <h1 className="font-display text-lg font-bold text-gray-800 leading-snug">
+              Postgraduate Administrative<br />Support System
+            </h1>
+            <p className="text-xs text-gray-400 mt-1.5 tracking-wide">University of Mines and Technology · Tarkwa</p>
           </div>
-          <h1 className="font-display text-3xl font-bold text-primary-foreground mb-3 leading-tight">
-            Postgraduate Administrative Support System
-          </h1>
-          <div className="w-12 h-0.5 bg-secondary/60 mx-auto my-4 rounded-full" />
-          <p className="text-sm text-primary-foreground/70 font-medium">University of Mines and Technology</p>
-          <p className="text-xs text-primary-foreground/40 mt-1">Tarkwa, Ghana</p>
-          <p className="text-xs text-secondary/70 mt-4 italic tracking-wide">Knowledge · Truth · Excellence</p>
-        </div>
-      </div>
 
-      {/* Right panel / Mobile full-screen */}
-      <main className="flex-1 relative flex items-center justify-center p-6 lg:p-8 overflow-hidden">
+          {/* Divider */}
+          <div className="border-t border-gray-100 mb-6" />
 
-        {/* Mobile background — navy gradient + decorative rings, hidden on desktop */}
-        <div className="lg:hidden absolute inset-0 gradient-navy">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute -top-16 -left-16 w-72 h-72 rounded-full border border-white/20" />
-            <div className="absolute -bottom-20 -right-10 w-80 h-80 rounded-full border border-white/20" />
-            <div className="absolute top-1/3 right-1/4 w-48 h-48 rounded-full border border-white/10" />
-          </div>
-          {/* Watermark logo */}
-          <img
-            src={umatLogo}
-            alt=""
-            aria-hidden="true"
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 opacity-[0.04] pointer-events-none select-none"
-          />
-        </div>
-
-        {/* Form card */}
-        <div className="relative z-10 w-full max-w-md">
-
-          {/* Mobile branding above card */}
-          <div className="lg:hidden text-center mb-8">
-            <img src={umatLogo} alt="UMaT Logo" className="w-16 h-auto mx-auto mb-3 drop-shadow-lg" />
-            <p className="font-display text-base font-bold text-primary-foreground leading-snug">
-              Postgraduate Administrative Support System
+          {/* Form */}
+          <div className="mb-6">
+            <h2 className="font-display text-2xl font-bold text-gray-800 mb-1">Welcome back</h2>
+            <p className="text-gray-400 text-sm min-h-5">
+              <span className="inline-flex items-center gap-1">
+                <span className="typing-cursor">Sign in to your account to continue</span>
+              </span>
             </p>
-            <p className="text-xs text-primary-foreground/60 mt-1">
-              University of Mines and Technology, Tarkwa
-            </p>
           </div>
 
-          {/* Card */}
-          <div className="bg-card/95 backdrop-blur-sm rounded-2xl border border-border shadow-2xl p-7 lg:p-0 lg:bg-transparent lg:border-0 lg:shadow-none lg:backdrop-blur-none">
-            <h2 className="font-display text-3xl font-bold text-foreground mb-2">Welcome back</h2>
-            <p className="text-muted-foreground mb-8">Sign in to your account to continue</p>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                <div className="relative">
-                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@umat.edu.gh"
-                    className="w-full pl-11 pr-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                  />
-                </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Email</label>
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@umat.edu.gh"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-700/20 focus:border-green-700/40 focus:bg-white transition-all duration-300"
+                />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
-                <div className="relative">
-                  <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-11 pr-11 py-3 rounded-lg border border-input bg-card text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Password</label>
+              <div className="relative">
+                <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-700/20 focus:border-green-700/40 focus:bg-white transition-all duration-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3 rounded-lg gradient-gold text-secondary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-              >
-                {submitting ? "Signing in…" : "Sign In"}
-              </button>
-            </form>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="group relative w-full py-2.5 mt-1 rounded-xl font-semibold text-sm text-white transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(17,94,89,0.28)] active:translate-y-0"
+              style={{ background: "linear-gradient(135deg, hsl(145,62%,20%), hsl(145,58%,27%))", boxShadow: "0 4px 18px hsl(145,62%,20%,0.4)" }}
+            >
+              <span className="relative z-10">{submitting ? "Signing in…" : "Sign In"}</span>
+            </button>
+          </form>
 
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              © {new Date().getFullYear()} UMaT School of Postgraduate Studies
-            </p>
-          </div>
+          <p className="mt-6 text-center text-[11px] font-semibold tracking-[0.24em] uppercase text-gray-600/90">
+            © {new Date().getFullYear()} UMaT School of Postgraduate Studies
+          </p>
         </div>
       </main>
     </div>
