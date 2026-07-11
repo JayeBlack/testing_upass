@@ -1,4 +1,5 @@
 const fetch = require("node-fetch");
+const db = require("../db");
 
 // ── Knowledge base (same as in the standalone chatbot) ──
 const KNOWLEDGE_BASE = `
@@ -46,9 +47,24 @@ Answer questions about admissions, programmes, fees, registration, seminars, and
 Be concise, professional, and use markdown. If unsure, suggest contacting the SPS office.
 ${KNOWLEDGE_BASE}`;
 
-const SUPERVISOR_SYSTEM_PROMPT = `You are an AI assistant for thesis supervisors at the University of Mines and Technology (UMaT), School of Postgraduate Studies.
+const buildSupervisorPrompt = (students) => {
+  let studentContext = "";
+  if (students && students.length > 0) {
+    studentContext = `
+
+## Your Assigned Students (live data)
+${students.map((s, i) =>
+  `${i + 1}. ${s.name} | Index: ${s.index_number} | Programme: ${s.program_name || "N/A"} | Department: ${s.department_name || "N/A"} | Thesis: ${s.thesis_title || "Not submitted"} | Thesis Status: ${s.thesis_status || "None"} | Assigned: ${s.assigned_at ? new Date(s.assigned_at).toLocaleDateString() : "N/A"}`
+).join("\n")}
+
+When asked about your students, use ONLY the above data. Do not invent or assume any details.`;
+  } else {
+    studentContext = "\n\nYou currently have no assigned students in the system.";
+  }
+  return `You are an AI assistant for thesis supervisors at the University of Mines and Technology (UMaT), School of Postgraduate Studies.
 Help supervisors with: thesis evaluation criteria, writing constructive feedback, tracking student progress, formatting guidelines, handling milestone delays, and best practices in postgraduate supervision.
-Be professional, concise, and practical.`;
+Be professional, concise, and practical.${studentContext}`;
+};
 
 // POST /api/chatbot/chat
 exports.chat = async (req, res) => {
@@ -59,7 +75,41 @@ exports.chat = async (req, res) => {
     if (!Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: "messages array is required" });
 
-    const systemPrompt = mode === "supervisor" ? SUPERVISOR_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    let systemPrompt = SYSTEM_PROMPT;
+    if (mode === "supervisor") {
+      let students = [];
+      try {
+        const userId = req.user?.id;
+        if (userId) {
+          const supRes = await db.query("SELECT id FROM supervisors WHERE user_id = $1", [userId]);
+          if (supRes.rows.length > 0) {
+            const supId = supRes.rows[0].id;
+            const stuRes = await db.query(
+              `SELECT s.id, CONCAT(u.first_name, ' ', u.last_name) AS name,
+                      s.index_number, p.name AS program_name, d.name AS department_name,
+                      ss.assigned_at,
+                      ts.title AS thesis_title, ts.status AS thesis_status
+               FROM student_supervisors ss
+               JOIN students s ON ss.student_id = s.id
+               JOIN users u ON s.user_id = u.id
+               LEFT JOIN programs p ON s.program_id = p.id
+               LEFT JOIN departments d ON s.department_id = d.id
+               LEFT JOIN LATERAL (
+                 SELECT title, status FROM thesis_submissions
+                 WHERE student_id = s.id ORDER BY submitted_at DESC LIMIT 1
+               ) ts ON true
+               WHERE ss.supervisor_id = $1
+               ORDER BY u.last_name`,
+              [supId]
+            );
+            students = stuRes.rows;
+          }
+        }
+      } catch (dbErr) {
+        console.error("[Chatbot] Failed to fetch supervisor students:", dbErr.message);
+      }
+      systemPrompt = buildSupervisorPrompt(students);
+    }
     const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
     const groqRes = await fetch(groqUrl, {
       method: "POST",

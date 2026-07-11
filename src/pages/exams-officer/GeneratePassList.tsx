@@ -29,6 +29,7 @@ const GeneratePassList = () => {
   const [deptFilter, setDeptFilter] = useState("all");
   const [progFilter, setProgFilter] = useState("all");
   const [yearFilter, setYearFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [minCwa, setMinCwa] = useState("50");
   const currentYear = new Date().getFullYear();
@@ -78,7 +79,8 @@ const GeneratePassList = () => {
     const matchesDept = effectiveDept === "all" || g.department_name === effectiveDept;
     return matchesDept &&
       (progFilter === "all" || g.program_name === progFilter) &&
-      (yearFilter === "all" || g.academic_year === yearFilter);
+      (yearFilter === "all" || g.academic_year === yearFilter) &&
+      (statusFilter === "all" || g.status === statusFilter);
   });
 
   // Pagination
@@ -91,7 +93,7 @@ const GeneratePassList = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [deptFilter, progFilter, yearFilter]);
+  }, [deptFilter, progFilter, yearFilter, statusFilter]);
 
   const handleExport = (format: "csv" | "pdf") => {
     const headers = ["Name", "Index Number", "Programme", "Department", "CWA", "Status"];
@@ -167,6 +169,11 @@ const GeneratePassList = () => {
             {departments.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         )}
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-3 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="all">All Statuses</option>
+          <option value="Eligible">Eligible</option>
+          <option value="Ineligible">Ineligible</option>
+        </select>
       </div>
 
       <p className="text-sm text-muted-foreground mb-4">Showing {paginatedGraduands.length} of {filtered.length} students {filtered.length !== graduands.length ? `(filtered from ${graduands.length} total)` : ""}</p>
