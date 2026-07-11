@@ -21,7 +21,9 @@ interface AIFeedbackPanelProps {
   onUseSuggestion: (text: string) => void;
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/supervisor-ai`;
+import { API_BASE_URL, getToken } from "@/lib/api";
+
+const CHAT_URL = `${API_BASE_URL}/chatbot/chat`;
 
 const categoryColors: Record<string, string> = {
   content: "bg-primary/10 text-primary",
@@ -50,40 +52,54 @@ const AIFeedbackPanel = ({ studentName, chapter, fileUrl, fileName, visible, onT
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${getToken()}`,
         },
         body: JSON.stringify({
-          mode: "feedback",
+          mode: "supervisor",
           messages: [
             {
               role: "user",
-              content: `Review the attached submission file from ${studentName} (${chapter}) — a postgraduate thesis chapter at UMaT — and produce specific feedback grounded in the actual content of the document.`,
+              content: `Generate 4 specific feedback suggestions for a postgraduate thesis submission by ${studentName} (${chapter}) at UMaT. Return ONLY a JSON array with objects having "text" and "category" fields. Categories must be one of: content, formatting, references, methodology, clarity. Example: [{"text":"...","category":"methodology"}]`,
             },
           ],
-          context: { student: studentName, chapter },
-          fileUrl,
-          fileName,
         }),
       });
 
       if (!resp.ok) throw new Error("Failed to get suggestions");
-      const data = await resp.json();
-      const content = data.choices?.[0]?.message?.content || "[]";
-      // Try to parse JSON from the response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (!resp.body) throw new Error("No response body");
+
+      // Collect full streamed content
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let idx;
+        while ((idx = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, idx).replace(/\r$/, "");
+          buffer = buffer.slice(idx + 1);
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) fullContent += content;
+          } catch { /* skip */ }
+        }
+      }
+
+      const jsonMatch = fullContent.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         setSource("live");
         setSuggestions(parsed.map((s: any) => ({ ...s, helpful: null })));
       } else {
-        // Fallback mock suggestions if AI doesn't return proper JSON
-        setSource("sample");
-        setSuggestions([
-          { text: "The methodology section could benefit from a clearer description of the research design and sampling strategy.", category: "methodology", helpful: null },
-          { text: "Consider adding more recent references (2023-2026) to strengthen the literature foundation.", category: "references", helpful: null },
-          { text: "Some paragraphs exceed the recommended length — consider breaking them into focused subsections.", category: "formatting", helpful: null },
-          { text: "The research objectives are well-stated. Ensure each is addressed in the findings chapter.", category: "content", helpful: null },
-        ]);
+        throw new Error("No JSON array in response");
       }
     } catch (e) {
       // Fallback suggestions
