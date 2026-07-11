@@ -93,7 +93,9 @@ const FeeAnnouncements = () => {
             audience: n.audience || "All Students",
             sentAt: n.created_at,
             recipients: n.recipient_count || 0,
-            downloadUrl: n.download_url || null,
+            downloadUrl: n.download_url
+              ? `${API_BASE_URL}/fees/download-schedule?url=${encodeURIComponent(n.download_url)}&name=fee-schedule.xlsx`
+              : null,
           })));
         }
       } catch {

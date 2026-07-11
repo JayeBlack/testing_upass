@@ -245,14 +245,7 @@ exports.getForUser = async (req, res) => {
       "SELECT id, user_id, title, message, type, severity, is_read, created_at, download_url FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50",
       [req.user.id]
     );
-    const base = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-    const rows = result.rows.map((n) => ({
-      ...n,
-      download_url: n.download_url
-        ? (n.download_url.startsWith('http') ? n.download_url : `${base}${n.download_url}`)
-        : null,
-    }));
-    res.json(rows);
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
