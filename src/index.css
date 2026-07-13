@@ -127,6 +127,77 @@
     background-clip: text;
   }
 
+  /* Page header — gold left accent bar + subtle green wash */
+  .page-header {
+    position: relative;
+    padding-left: 1rem;
+  }
+  .page-header::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.15em;
+    bottom: 0.15em;
+    width: 3px;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, hsl(48 95% 50%), hsl(45 85% 48%));
+  }
+
+  /* Elevated card — soft shadow + faint gold top border */
+  .card-elevated {
+    box-shadow: 0 4px 24px -4px hsl(145 60% 22% / 0.08), 0 1px 4px hsl(145 60% 22% / 0.04);
+    border-top: 1.5px solid hsl(48 95% 50% / 0.18);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .card-elevated:hover {
+    box-shadow: 0 8px 32px -4px hsl(145 60% 22% / 0.13), 0 2px 8px hsl(145 60% 22% / 0.06);
+    transform: translateY(-1px);
+  }
+
+  /* Table header — faint green tint */
+  .table-head-row th {
+    background: hsl(145 60% 22% / 0.04);
+  }
+  .dark .table-head-row th {
+    background: hsl(145 60% 22% / 0.18);
+  }
+
+  /* Section divider — gold gradient hr */
+  .section-divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(48 95% 50% / 0.35), hsl(145 60% 22% / 0.12), transparent);
+    margin: 1.5rem 0;
+  }
+
+  /* Onboarding modal slide animations */
+  .onboarding-slide-enter {
+    animation: slide-in-right 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .onboarding-slide-exit {
+    animation: slide-out-left 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  .onboarding-slide-back-enter {
+    animation: slide-in-left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  /* Checklist panel slide-up */
+  .checklist-panel-enter {
+    animation: panel-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease both;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
+
   .animate-float-slow {
     animation: float-slow 12s ease-in-out infinite;
   }
@@ -160,6 +231,34 @@
     border-right: 2px solid rgba(15, 23, 42, 0.35);
     animation: typing 3.4s steps(34, end) 0.6s 1 normal both, blink 0.8s step-end infinite 4.2s;
   }
+
+  /* Onboarding modal slide animations */
+  .onboarding-slide-enter {
+    animation: slide-in-right 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .onboarding-slide-exit {
+    animation: slide-out-left 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+  .onboarding-slide-back-enter {
+    animation: slide-in-left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  /* Checklist panel slide-up */
+  .checklist-panel-enter {
+    animation: panel-slide-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease both;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; }
 }
 
 @keyframes float-slow {
@@ -190,6 +289,31 @@
 @keyframes shimmer {
   0% { transform: translateX(-120%); }
   100% { transform: translateX(120%); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slide-out-left {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(-32px); }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes panel-slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes typing {

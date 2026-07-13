@@ -13,6 +13,8 @@ import {
 import { LogOut, Bell, Camera, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import OnboardingModal from "./OnboardingModal";
+import GettingStartedChecklist from "./GettingStartedChecklist";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -65,12 +67,26 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
     return () => clearInterval(id);
   }, [user]);
 
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const flag = localStorage.getItem("umat_show_onboarding");
+    if (flag === "true") {
+      setShowOnboarding(true);
+      localStorage.removeItem("umat_show_onboarding");
+    }
+  }, [user]);
+
   if (!isAuthenticated) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-background">
       <Sidebar />
       <MobileHeader />
+      {showOnboarding && user && (
+        <OnboardingModal user={user} onClose={() => setShowOnboarding(false)} />
+      )}
 
       {/* Top bar */}
       <div className={`no-print relative ${isMobile ? "px-4 py-3" : "ml-64 px-8 py-4"} flex items-center justify-between gap-3 sm:gap-4 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30`}>
@@ -159,9 +175,18 @@ const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         )}
       </div>
 
-      <main className={`${isMobile ? "p-4 pt-6" : "ml-64 p-8"} min-w-0 animate-fade-in overflow-x-hidden`}>
+      {/* Subtle green radial bloom in top-left of content area — carries login's design language */}
+      <div
+        className={`pointer-events-none fixed top-0 ${isMobile ? "left-0" : "left-64"} w-[480px] h-[320px] opacity-[0.035] blur-[80px] z-0`}
+        style={{ background: "radial-gradient(ellipse at top left, hsl(145,60%,22%), transparent 70%)" }}
+        aria-hidden="true"
+      />
+
+      <main className={`relative z-10 ${isMobile ? "p-4 pt-6" : "ml-64 p-8"} min-w-0 animate-fade-in overflow-x-hidden`}>
         {children}
       </main>
+
+      {user && <GettingStartedChecklist />}
 
       <input
         ref={avatarInputRef}
