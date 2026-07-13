@@ -5,6 +5,7 @@
 
 TRUNCATE TABLE
   audit_logs,
+  broadcast_logs,
   announcement_reads,
   supervisor_announcement_recipients,
   supervisor_resource_recipients,
