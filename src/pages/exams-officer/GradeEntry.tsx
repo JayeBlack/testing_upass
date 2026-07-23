@@ -393,11 +393,9 @@ const GradeEntry = () => {
             {isPublishing && <Loader2 size={14} className="animate-spin" />}
             {status === "Published" ? "Published" : "Publish Results"}
           </button>
-          {cwaResults.length > 0 && (
-            <button onClick={deletePublished} disabled={isPublishing} className="px-5 py-2.5 rounded-lg border border-destructive/30 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
-              {status === "Published" ? "Delete Published Results" : "Clear Draft"}
-            </button>
-          )}
+          <button onClick={deletePublished} disabled={isPublishing} className="px-5 py-2.5 rounded-lg border border-destructive/30 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50">
+            {status === "Published" ? "Delete Published Results" : "Clear Draft"}
+          </button>
         </div>
       )}
 
