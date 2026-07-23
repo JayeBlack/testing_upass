@@ -1,7 +1,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import { Navigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { ShieldCheck, Link2, X, Trash2, Users, Loader2 } from "lucide-react";
+import { ShieldCheck, Link2, Trash2, Users, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -182,7 +182,7 @@ const svArray = Array.isArray(supervisorsData)
               {departments.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
             <button
-              onClick={() => setOpen(true)}
+              onClick={() => setOpen(!open)}
               className="inline-flex w-full items-center justify-center gap-2 px-5 py-2.5 rounded-lg gradient-gold text-secondary-foreground font-medium text-sm hover:opacity-90 transition-opacity shrink-0 sm:w-auto"
             >
               <Link2 size={15} /> New Assignment
@@ -190,6 +190,94 @@ const svArray = Array.isArray(supervisorsData)
           </div>
         </div>
       </div>
+
+      {open && (
+        <div className="bg-card rounded-2xl border border-border p-6 shadow-xl mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-display text-lg font-bold text-foreground">New Supervisor Assignment</h3>
+            <button onClick={() => { setOpen(false); setStudentSearch(""); setSupervisorSearch(""); setStudentId(""); setSupervisorId(""); }} className="p-2 rounded-lg border border-border text-sm text-foreground hover:bg-muted transition-colors">Close</button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Student *</label>
+              <input
+                value={studentSearch}
+                onChange={(e) => { setStudentSearch(e.target.value); setStudentId(""); }}
+                placeholder="Search by name or index number..."
+                className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none"
+              />
+              {studentSearch && !studentId && (
+                <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-md">
+                  {(() => {
+                    const q = studentSearch.toLowerCase();
+                    const filtered = students.filter((s) =>
+                      `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) || s.index_number.toLowerCase().includes(q)
+                    ).slice(0, 20);
+                    return filtered.length === 0
+                      ? <p className="px-4 py-3 text-sm text-muted-foreground">No students found</p>
+                      : filtered.map((s) => (
+                        <button key={s.id} type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setStudentId(s.id); setStudentSearch(`${s.first_name} ${s.last_name} · ${s.index_number}`); }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <span className="font-medium text-foreground">{s.first_name} {s.last_name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground font-mono">{s.index_number}</span>
+                        </button>
+                      ));
+                  })()}
+                </div>
+              )}
+              {studentId && <p className="mt-1 text-xs text-success">✓ Student selected</p>}
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Supervisor *</label>
+              <input
+                value={supervisorSearch}
+                onChange={(e) => { setSupervisorSearch(e.target.value); setSupervisorId(""); }}
+                placeholder="Search by name or department..."
+                className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none"
+              />
+              {supervisorSearch && !supervisorId && (
+                <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-md">
+                  {(() => {
+                    const q = supervisorSearch.toLowerCase();
+                    const filtered = supervisors.filter((sv) =>
+                      `${sv.first_name} ${sv.last_name}`.toLowerCase().includes(q) || sv.department_name?.toLowerCase().includes(q)
+                    ).slice(0, 20);
+                    return filtered.length === 0
+                      ? <p className="px-4 py-3 text-sm text-muted-foreground">No supervisors found</p>
+                      : filtered.map((sv) => (
+                        <button key={sv.id} type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => { setSupervisorId(sv.id); setSupervisorSearch(`${sv.first_name} ${sv.last_name} · ${sv.department_name}`); }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <span className="font-medium text-foreground">{sv.first_name} {sv.last_name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{sv.department_name}</span>
+                        </button>
+                      ));
+                  })()}
+                </div>
+              )}
+              {supervisorId && <p className="mt-1 text-xs text-success">✓ Supervisor selected</p>}
+            </div>
+            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPrimary}
+                onChange={(e) => setIsPrimary(e.target.checked)}
+                className="w-4 h-4 rounded border-input"
+              />
+              Mark as primary supervisor
+            </label>
+            <Button onClick={handleAssign} disabled={saving} className="w-full gradient-gold text-secondary-foreground hover:opacity-90">
+              {saving ? <Loader2 size={14} className="animate-spin mr-1.5" /> : null}
+              Create Assignment
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
         {/* Desktop table */}
@@ -332,101 +420,6 @@ const svArray = Array.isArray(supervisorsData)
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/30 backdrop-blur-sm p-4" onClick={() => setOpen(false)}>
-          <div className="bg-card rounded-2xl border border-border p-6 max-w-lg w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="font-display text-lg font-bold text-foreground">New Supervisor Assignment</h3>
-              <button onClick={() => { setOpen(false); setStudentSearch(""); setSupervisorSearch(""); setStudentId(""); setSupervisorId(""); }} className="p-1 rounded hover:bg-muted transition-colors">
-                <X size={18} className="text-muted-foreground" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Student *</label>
-                <input
-                  value={studentSearch}
-                  onChange={(e) => { setStudentSearch(e.target.value); setStudentId(""); }}
-                  placeholder="Search by name or index number..."
-                  className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none"
-                />
-                {studentSearch && !studentId && (
-                  <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-md">
-                    {(() => {
-                      const q = studentSearch.toLowerCase();
-                      const filtered = students.filter((s) =>
-                        `${s.first_name} ${s.last_name}`.toLowerCase().includes(q) || s.index_number.toLowerCase().includes(q)
-                      ).slice(0, 20);
-                      return filtered.length === 0
-                        ? <p className="px-4 py-3 text-sm text-muted-foreground">No students found</p>
-                        : filtered.map((s) => (
-                          <button key={s.id} type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => { setStudentId(s.id); setStudentSearch(`${s.first_name} ${s.last_name} · ${s.index_number}`); }}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors"
-                          >
-                            <span className="font-medium text-foreground">{s.first_name} {s.last_name}</span>
-                            <span className="ml-2 text-xs text-muted-foreground font-mono">{s.index_number}</span>
-                          </button>
-                        ));
-                    })()}
-                  </div>
-                )}
-                {studentId && <p className="mt-1 text-xs text-success">✓ Student selected</p>}
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Supervisor *</label>
-                <input
-                  value={supervisorSearch}
-                  onChange={(e) => { setSupervisorSearch(e.target.value); setSupervisorId(""); }}
-                  placeholder="Search by name or department..."
-                  className="w-full mt-1 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:ring-2 focus:ring-ring outline-none"
-                />
-                {supervisorSearch && !supervisorId && (
-                  <div className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-md">
-                    {(() => {
-                      const q = supervisorSearch.toLowerCase();
-                      const filtered = supervisors.filter((sv) =>
-                        `${sv.first_name} ${sv.last_name}`.toLowerCase().includes(q) || sv.department_name?.toLowerCase().includes(q)
-                      ).slice(0, 20);
-                      return filtered.length === 0
-                        ? <p className="px-4 py-3 text-sm text-muted-foreground">No supervisors found</p>
-                        : filtered.map((sv) => (
-                          <button key={sv.id} type="button"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => { setSupervisorId(sv.id); setSupervisorSearch(`${sv.first_name} ${sv.last_name} · ${sv.department_name}`); }}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted transition-colors"
-                          >
-                            <span className="font-medium text-foreground">{sv.first_name} {sv.last_name}</span>
-                            <span className="ml-2 text-xs text-muted-foreground">{sv.department_name}</span>
-                          </button>
-                        ));
-                    })()}
-                  </div>
-                )}
-                {supervisorId && <p className="mt-1 text-xs text-success">✓ Supervisor selected</p>}
-              </div>
-
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isPrimary}
-                  onChange={(e) => setIsPrimary(e.target.checked)}
-                  className="w-4 h-4 rounded border-input"
-                />
-                Mark as primary supervisor
-              </label>
-
-              <Button onClick={handleAssign} disabled={saving} className="w-full gradient-gold text-secondary-foreground hover:opacity-90">
-                {saving ? <Loader2 size={14} className="animate-spin mr-1.5" /> : null}
-                Create Assignment
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 };
