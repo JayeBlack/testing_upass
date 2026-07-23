@@ -216,7 +216,7 @@ exports.bulkApprove = async (req, res) => {
 exports.getSupervisorPending = async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT
+      `SELECT DISTINCT ON (cs.id)
          cs.id, cs.status, cs.note, cs.cleared_at,
          s.id AS student_id, s.index_number,
          u.first_name, u.last_name,
@@ -225,10 +225,15 @@ exports.getSupervisorPending = async (req, res) => {
        JOIN students s ON cs.student_id = s.id
        JOIN users u ON s.user_id = u.id
        LEFT JOIN programs p ON s.program_id = p.id
+       LEFT JOIN student_supervisors ss ON ss.student_id = s.id AND ss.is_primary = true
+       LEFT JOIN supervisors sv ON sv.id = ss.supervisor_id
        WHERE cs.department = 'Thesis Submission'
-         AND cs.supervisor_user_id = $1
          AND cs.status = 'pending'
-       ORDER BY u.last_name, u.first_name`,
+         AND (
+           cs.supervisor_user_id = $1
+           OR sv.user_id = $1
+         )
+       ORDER BY cs.id, u.last_name, u.first_name`,
       [req.user.id]
     );
     res.json(result.rows);
